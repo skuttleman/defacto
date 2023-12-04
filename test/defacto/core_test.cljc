@@ -28,7 +28,7 @@
   (::something-else db))
 
 (deftest DefactoStore-test
-  (let [store (defacto/->DefactoStore {} (atom {}) atom)
+  (let [store (defacto/create {} {} atom)
         result (defacto/subscribe store [::result?])
         something-else (defacto/subscribe store [::something-else?])
         notifications (atom [])]

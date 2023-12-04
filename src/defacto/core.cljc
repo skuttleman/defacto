@@ -63,6 +63,15 @@
                        (f key store old new)))
   store)
 
+(defn ^:private ->query-cached-sub-fn [->sub]
+  ;; it's an atom of atoms. be careful.
+  (let [query-cache (atom {})]
+    (fn [query result]
+      (let [sub (-> query-cache
+                    (swap! update query #(or % (->sub result)))
+                    (get query))]
+        (doto sub (reset! result))))))
+
 (deftype ImmutableSubscription [sub]
   #?@(:cljs    [IDeref
                 (-deref [_] @sub)
@@ -79,8 +88,6 @@
                 (addWatch [this key f] (add-watch* this sub key f))
                 (removeWatch [_ key] (remove-watch sub key))]))
 
-;; you can use this to make a reactive store with [reagent](https://github.com/reagent-project/reagent).
-;; (->DefactoStore {:some :ctx} (clojure.core/atom {:some :db}) reagent.core/atom)
 (deftype DefactoStore [ctx state ->sub]
   IDeref
   (#?(:cljs -deref :default deref) [_] @state)
@@ -94,7 +101,7 @@
                        nil))
     this)
   (-subscribe [_ q]
-    (let [sub (->sub (query @state q))]
+    (let [sub (->sub q (query @state q))]
       (add-watch state (gensym) (fn [_ _ old new]
                                   (let [prev (query old q)
                                         next (query new q)]
@@ -103,10 +110,32 @@
       (->ImmutableSubscription sub))))
 
 (defn create
-  "Creates a basic, deref-able state store. `ctx-map` is an arbitrary map which will be passed to
-   [[command-handler]] including a reference to the store at `:defacto.core/store`."
-  [ctx-map init-db]
-  (->DefactoStore ctx-map (atom init-db) atom))
+  "Creates a basic, deref-able state store which takes these arguments.
+
+   `ctx-map`          - any arbitrary map of clojure data. keys with the namespace
+                        `defacto*` (i.e. `:defacto.whatever/some-key`) are reserved
+                        for use by this library.
+
+   `init-db`          - the initial value of your db.
+
+   `->sub` (optional) - a function that returns something that behaves like an atom.
+                        For example, [[clojure.core/atom]] or [[reagent.core/atom]].
+                        Specifically, it needs to support these protocol methods:
+
+                        clj  - `IAtom/reset`, `IDeref/deref`
+                        cljs - `IReset/-reset`, `IDeref/-deref`
+
+                        If you want to *watch* your subscriptions, then the return value
+                        of `->sub` must also satisfy:
+
+                        clj  - `IRef/addWatch`, `IRef/removeWatch` (and notify watchers
+                               in impl of `IAtom/reset`)
+                        cljs - `IWatchable/-add-watch` `IWatchable/-remove-watch, and
+                               `IWatchable/-notify-watches`"
+  ([ctx-map init-db]
+   (create ctx-map init-db atom))
+  ([ctx-map init-db ->sub]
+   (->DefactoStore ctx-map (atom init-db) (->query-cached-sub-fn ->sub))))
 
 (defn dispatch!
   "Dispatches a `command` through the store. The `command` should be a vector with a keyword in

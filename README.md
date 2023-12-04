@@ -64,10 +64,52 @@ I love [reagent](https://github.com/reagent-project/reagent), and I use it for a
 reactive `reagent` store with `defacto` is super easy!
 
 ```clojure
-(defacto/->DefactoStore ctx-map (clojure.core/atom initial-db) reagent.core/atom)
+(ns killer-app.core
+  (:require
+    [cljs.core.async :as async]
+    [cljs-http.client :as http]
+    [defacto.core :as defacto]
+    [reagent.core :as r]
+    [reagent.dom :as rdom]))
+
+(def component []
+  (r/with-let [store (defacto/create {:http-fn http/request} {:init :db} r/atom)
+               sub (defacto/subscribe [::page-data? 123])]
+    (let [{:keys [status data error]} @sub]
+      [:div.my-app
+       [:h1 "Hello, app!"]
+       [:button {:on-click #(defacto/dispatch! store [::fetch-data! 123])}
+        "fetch data"]
+       [:div
+        (case status
+          :ok data
+          :bad error
+          "nothing yet")]])))
+
+(rdom/render [component] (.getElementById js/document "root"))
+
+(defmethod defacto/command-handler ::fetch-data!
+  [{:keys [http-fn]} [ id] emit-cb]
+  (async/go
+    (let [result (async/<! (http-fn {...}))]
+      (if (= 200 (:status result))
+        (emit-cb [::fetch-succeeded {:id id :data (:body result)}])
+        (emit-cb [::fetch-failed {:id id :error (:body result)}])))))
+
+(defmethod defacto/event-handler ::fetch-succeeded
+  [db [_ {:keys [id data]}]]
+  (assoc-in db [:my-data id] {:status :ok :data data}))
+
+(defmethod defacto/event-handler ::fetch-failed
+  [db [_ {:keys [id error]}]]
+  (assoc-in db [:my-data id] {:status :bad :data error}))
+
+(defmethod defacto/query ::page-data?
+  [db [_ id]]
+  (get-in db [:my-data id]))
 ```
 
 ## Why?
 
-Good question. [re-frame](https://github.com/day8/re-frame) is awesome, but it's too heavy-weight for me.
-Also, I prefer to be able to make multiple, isolated stores.
+Good question. [re-frame](https://github.com/day8/re-frame) is awesome, but it's too heavy-weight for me. I prefer
+building things out of smaller things.
