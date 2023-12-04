@@ -6,13 +6,16 @@ A lightweight, highly customizable state store for clojure(script).
 
 ```clojure
 (require '[defacto.core :as defacto])
+(require '[clojure.core.async :as async])
 
 ;; make some command handlers
 (defmethod defacto/command-handler :stuff/create!
   [{::defacto/keys [store] :as _ctx-map} _db-value [_ command-arg :as _command] emit-cb]
-  (do-stuff! ctx-map)
-  (defacto/dispatch! store [:another/command!])
-  (emit-cb [:stuff/created command-arg]))
+  (async/go
+    (do-stuff! ctx-map)
+    (defacto/dispatch! store [:another/command!])
+    (do-more-stuff! ctx-map)
+    (emit-cb [:stuff/created command-arg])))
 
 ;; make some event handlers
 (defmethod defacto/event-handler :stuff/created
@@ -22,7 +25,7 @@ A lightweight, highly customizable state store for clojure(script).
 ;; make some subscription handlers
 (defmethod defacto/query :stuff/stuff?
   [db [_ default]]
-  (:stuff/value db default))
+  (or (:stuff/value db) default))
 
 
 ;; make a store
@@ -52,7 +55,7 @@ which `keywords` you use for `commands`, `events`, or `queries`. Here is a conve
 ```clojure
 [:some.domain/do-something! {...}] ;; `commands` are present-tense verbs ending with a `!`
 [:some.domain/something-happened {...}] ;; `events` are past-tense verbs
-[:some.domain/something? {...}] ;; `queries` are nouns ending with a `?`
+[:some.domain/thing? {...}] ;; `queries` are nouns ending with a `?`
 ```
 
 ## Use with Reagent
@@ -61,7 +64,7 @@ I love [reagent](https://github.com/reagent-project/reagent), and I use it for a
 reactive `reagent` store with `defacto` is super easy!
 
 ```clojure
-(defacto/->DefactoStore ctx-map (atom initial-db) reagent.core/atom)
+(defacto/->DefactoStore ctx-map (clojure.core/atom initial-db) reagent.core/atom)
 ```
 
 ## Why?

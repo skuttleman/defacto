@@ -103,8 +103,8 @@
       (->ImmutableSubscription sub))))
 
 (defn create
-  "Creates a basic store. `ctx-map` is an arbitrary map which will be passed to [[command-handler]]
-   including a reference to the store at `:defacto.core/store`."
+  "Creates a basic, deref-able state store. `ctx-map` is an arbitrary map which will be passed to
+   [[command-handler]] including a reference to the store at `:defacto.core/store`."
   [ctx-map init-db]
   (->DefactoStore ctx-map (atom init-db) atom))
 
