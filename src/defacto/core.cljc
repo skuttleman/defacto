@@ -72,6 +72,26 @@
                     (get query))]
         (doto sub (reset! result))))))
 
+(deftype DumbStore [ctx volatile-db]
+  IDeref
+  (deref [_] @volatile-db)
+
+  IStore
+  (-dispatch! [this command]
+    (command-handler (assoc ctx ::store this)
+                     command
+                     (fn [event]
+                       (vswap! volatile-db event-handler event)
+                       nil)))
+  (-subscribe [_ query]
+    (reify
+      IDeref
+      (deref [_] (query @volatile-db query))
+
+      IRef
+      (addWatch [this _ _] this)
+      (removeWatch [this _] this))))
+
 (deftype ImmutableSubscription [sub]
   #?@(:cljs    [IDeref
                 (-deref [_] @sub)
