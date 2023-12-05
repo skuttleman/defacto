@@ -72,30 +72,6 @@
                     (get query))]
         (doto sub (reset! result))))))
 
-(deftype DumbStore [ctx volatile-db]
-  IDeref
-  (#?(:cljs -deref :default deref) [_] @volatile-db)
-
-  IStore
-  (-dispatch! [this command]
-    (command-handler (assoc ctx ::store this)
-                     command
-                     (fn [event]
-                       (vswap! volatile-db event-handler event)
-                       nil)))
-  (-subscribe [_ query]
-    (reify
-      IDeref
-      (#?(:cljs -deref :default deref) [_] (query @volatile-db query))
-
-      #?@(:cljs    [IWatchable
-                    (-add-watch [this key f] this)
-                    (-remove-watch [this _] this)
-                    (-notify-watches [this _ _] this)]
-          :default [IRef
-                    (addWatch [this _ _] this)
-                    (removeWatch [this _] this)]))))
-
 (deftype ImmutableSubscription [sub]
   IDeref
   (#?(:cljs -deref :default deref) [_] @sub)
@@ -109,25 +85,25 @@
                 (addWatch [this key f] (add-watch* this sub key f))
                 (removeWatch [_ key] (remove-watch sub key))]))
 
-(deftype DefactoStore [ctx state ->sub]
+(deftype DefactoStore [ctx-map atom-db ->atom-sub]
   IDeref
-  (#?(:cljs -deref :default deref) [_] @state)
+  (#?(:cljs -deref :default deref) [_] @atom-db)
 
   IStore
   (-dispatch! [this command]
-    (command-handler (assoc ctx ::store this)
+    (command-handler (assoc ctx-map ::store this)
                      command
                      (fn [event]
-                       (swap! state event-handler event)
+                       (swap! atom-db event-handler event)
                        nil))
     this)
   (-subscribe [_ q]
-    (let [sub (->sub q (query @state q))]
-      (add-watch state (gensym) (fn [_ _ old new]
-                                  (let [prev (query old q)
-                                        next (query new q)]
-                                    (when-not (= prev next)
-                                      (reset! sub next)))))
+    (let [sub (->atom-sub q (query @atom-db q))]
+      (add-watch atom-db q (fn [_ _ old new]
+                             (let [prev (query old q)
+                                   next (query new q)]
+                               (when-not (= prev next)
+                                 (reset! sub next)))))
       (->ImmutableSubscription sub))))
 
 (defn create
@@ -191,3 +167,27 @@
 (defmethod event-handler :default
   [db _event]
   db)
+
+(deftype UnwatchableVolatileStore [ctx volatile-db]
+  IDeref
+  (#?(:cljs -deref :default deref) [_] @volatile-db)
+
+  IStore
+  (-dispatch! [this command]
+    (command-handler (assoc ctx ::store this)
+                     command
+                     (fn [event]
+                       (vswap! volatile-db event-handler event)
+                       nil)))
+  (-subscribe [_ query]
+    (reify
+      IDeref
+      (#?(:cljs -deref :default deref) [_] (query @volatile-db query))
+
+      #?@(:cljs    [IWatchable
+                    (-add-watch [this key f] this)
+                    (-remove-watch [this _] this)
+                    (-notify-watches [this _ _] this)]
+          :default [IRef
+                    (addWatch [this _ _] this)
+                    (removeWatch [this _] this)]))))
