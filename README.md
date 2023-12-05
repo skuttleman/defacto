@@ -1,6 +1,6 @@
 # defacto
 
-A lightweight, highly customizable state store for clojure(script).
+The `defacto` state store library. A lightweight, highly customizable state store for clojure(script).
 
 ## Usage
 
@@ -23,7 +23,7 @@ A lightweight, highly customizable state store for clojure(script).
   (assoc db :stuff/value value))
 
 ;; make some subscription handlers
-(defmethod defacto/query :stuff/stuff?
+(defmethod defacto/query-handler :stuff/stuff
   [db [_ default]]
   (or (:stuff/value db) default))
 
@@ -32,7 +32,7 @@ A lightweight, highly customizable state store for clojure(script).
 (def my-store (defacto/create {:some :ctx} {:stuff/value nil}))
 
 ;; make a subscription
-(def subscription (defacto/subscribe my-store [:stuff/stuff? 3]))
+(def subscription (defacto/subscribe my-store [:stuff/stuff 3]))
 (deref subscription)
 ;; returns default value
 ;; => 3
@@ -55,7 +55,7 @@ which `keywords` you use for `commands`, `events`, or `queries`. Here is a conve
 ```clojure
 [:some.domain/do-something! {...}] ;; `commands` are present-tense verbs ending with a `!`
 [:some.domain/something-happened {...}] ;; `events` are past-tense verbs
-[:some.domain/thing? {...}] ;; `queries` are nouns ending with a `?`
+[:some.domain/thing {...}] ;; `queries` are nouns
 ```
 
 ## Use with Reagent
@@ -72,9 +72,8 @@ reactive `reagent` store with `defacto` is super easy!
     [reagent.core :as r]
     [reagent.dom :as rdom]))
 
-(def component []
-  (r/with-let [store (defacto/create {:http-fn http/request} {:init :db} r/atom)
-               sub (defacto/subscribe [::page-data? 123])]
+(def component [store]
+  (r/with-let [sub (defacto/subscribe [::page-data 123])]
     (let [{:keys [status data error]} @sub]
       [:div.my-app
        [:h1 "Hello, app!"]
@@ -86,12 +85,24 @@ reactive `reagent` store with `defacto` is super easy!
           :bad error
           "nothing yet")]])))
 
-(rdom/render [component] (.getElementById js/document "root"))
+(defn app-root []
+  (r/with-let [store (defacto/create {:http-fn http/request} {:init :db} r/atom)]
+                                                                      ;; using [[r/atom]] gets you
+                                                                      ;; **reactive subscriptions**
+                                                                      ;; deref-ing the store is _NOT_ reactive
+    [component store]))
+
+(rdom/render [app-root] (.getElementById js/document "root"))
 
 (defmethod defacto/command-handler ::fetch-data!
-  [{:keys [http-fn]} [ id] emit-cb]
+  [{::defacto/keys [store] :keys [http-fn]} [ id] emit-cb]
   (async/go
-    (let [result (async/<! (http-fn {...}))]
+    (let [result (async/<! (http-fn {...}))
+          ;; deref-ing the store is NOT reactive and can be used inside command handlers
+          current-db @store
+          ;; query the db directly instead of using subscriptions
+          page-data (defacto/query-handler current-db [::page-data])]
+      (do-something-with page-data)
       (if (= 200 (:status result))
         (emit-cb [::fetch-succeeded {:id id :data (:body result)}])
         (emit-cb [::fetch-failed {:id id :error (:body result)}])))))
@@ -104,7 +115,7 @@ reactive `reagent` store with `defacto` is super easy!
   [db [_ {:keys [id error]}]]
   (assoc-in db [:my-data id] {:status :bad :data error}))
 
-(defmethod defacto/query ::page-data?
+(defmethod defacto/query-handler ::page-data
   [db [_ id]]
   (get-in db [:my-data id]))
 ```

@@ -47,7 +47,7 @@
            ```"
           (fn [_ [type]] type))
 
-(defmulti ^{:arglists '([db query])} query
+(defmulti ^{:arglists '([db query-handler])} query-handler
           "Processes a query and returns the data from the db. Your [[query]]
            implementation should have NO SIDE EFFECTS.
 
@@ -64,10 +64,9 @@
   store)
 
 (defn ^:private ->query-cached-sub-fn [->sub]
-  ;; it's an atom of atoms. be careful.
-  (let [query-cache (atom {})]
+  (let [query->sub (atom {})]
     (fn [query result]
-      (let [sub (-> query-cache
+      (let [sub (-> query->sub
                     (swap! update query #(or % (->sub result)))
                     (get query))]
         (doto sub (reset! result))))))
@@ -76,16 +75,50 @@
   IDeref
   (#?(:cljs -deref :default deref) [_] @sub)
 
-  #?@(:cljs    [IWatchable
-                (-add-watch [this key f] (add-watch* this sub key f))
-                (-remove-watch [_ key] (remove-watch sub key))
-                (-notify-watches [_ oldval newval] (-notify-watches sub oldval newval))]
+  #?@(:cljs
+      [IWatchable
+       (-add-watch [this key f] (add-watch* this sub key f))
+       (-remove-watch [_ key] (remove-watch sub key))
+       (-notify-watches [_ old new] (-notify-watches sub old new))]
 
-      :default [IRef
-                (addWatch [this key f] (add-watch* this sub key f))
-                (removeWatch [_ key] (remove-watch sub key))]))
+      :default
+      [IRef
+       (addWatch [this key f] (add-watch* this sub key f))
+       (removeWatch [_ key] (remove-watch sub key))]))
 
-(deftype DefactoStore [ctx-map atom-db ->atom-sub]
+(deftype DefactoStore [store ->atom-sub]
+  IDeref
+  (#?(:cljs -deref :default deref) [_] @store)
+
+  IStore
+  (-dispatch! [this command]
+    (-dispatch! store command)
+    this)
+  (-subscribe [_ query]
+    (let [sub (->atom-sub query (query-handler @store query))]
+      (add-watch store query (fn [_ _ old new]
+                               (let [prev (query-handler old query)
+                                     next (query-handler new query)]
+                                 (when-not (= prev next)
+                                   (reset! sub next)))))
+      (->ImmutableSubscription sub))))
+
+(deftype UnwatchableSubscription [atom-db query]
+  IDeref
+  (#?(:cljs -deref :default deref) [_] (query-handler @atom-db query))
+
+  #?@(:cljs
+      [IWatchable
+       (-add-watch [this _ _] this)
+       (-remove-watch [this _] this)
+       (-notify-watches [this _ _] this)]
+
+      :default
+      [IRef
+       (addWatch [this _ _] this)
+       (removeWatch [this _] this)]))
+
+(deftype WatchableStore [ctx-map atom-db]
   IDeref
   (#?(:cljs -deref :default deref) [_] @atom-db)
 
@@ -95,16 +128,20 @@
                      command
                      (fn [event]
                        (swap! atom-db event-handler event)
-                       nil))
-    this)
-  (-subscribe [_ q]
-    (let [sub (->atom-sub q (query @atom-db q))]
-      (add-watch atom-db q (fn [_ _ old new]
-                             (let [prev (query old q)
-                                   next (query new q)]
-                               (when-not (= prev next)
-                                 (reset! sub next)))))
-      (->ImmutableSubscription sub))))
+                       nil)))
+  (-subscribe [_ query]
+    (->UnwatchableSubscription atom-db query))
+
+  #?@(:cljs
+      [IWatchable
+       (-add-watch [this key f] (add-watch* this atom-db key f))
+       (-remove-watch [_ key] (remove-watch atom-db key))
+       (-notify-watches [this _ _] this)]
+
+      :default
+      [IRef
+       (addWatch [this key f] (add-watch* this atom-db key f))
+       (removeWatch [_ key] (remove-watch atom-db key))]))
 
 (defn create
   "Creates a basic, deref-able state store which takes these arguments.
@@ -132,7 +169,8 @@
   ([ctx-map init-db]
    (create ctx-map init-db atom))
   ([ctx-map init-db ->sub]
-   (->DefactoStore ctx-map (atom init-db) (->query-cached-sub-fn ->sub))))
+   (let [base-store (->WatchableStore ctx-map (atom init-db))]
+     (->DefactoStore base-store (->query-cached-sub-fn ->sub)))))
 
 (defn dispatch!
   "Dispatches a `command` through the store. The `command` should be a vector with a keyword in
@@ -167,27 +205,3 @@
 (defmethod event-handler :default
   [db _event]
   db)
-
-(deftype UnwatchableVolatileStore [ctx volatile-db]
-  IDeref
-  (#?(:cljs -deref :default deref) [_] @volatile-db)
-
-  IStore
-  (-dispatch! [this command]
-    (command-handler (assoc ctx ::store this)
-                     command
-                     (fn [event]
-                       (vswap! volatile-db event-handler event)
-                       nil)))
-  (-subscribe [_ query]
-    (reify
-      IDeref
-      (#?(:cljs -deref :default deref) [_] (query @volatile-db query))
-
-      #?@(:cljs    [IWatchable
-                    (-add-watch [this key f] this)
-                    (-remove-watch [this _] this)
-                    (-notify-watches [this _ _] this)]
-          :default [IRef
-                    (addWatch [this _ _] this)
-                    (removeWatch [this _] this)]))))

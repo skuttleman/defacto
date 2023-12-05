@@ -11,26 +11,26 @@
   [db [_ result]]
   (assoc db ::result result))
 
-(defmethod defacto/query ::result?
+(defmethod defacto/query-handler ::result
   [db _]
   (::result db))
 
-(defmethod defacto/command-handler ::another!
+(defmethod defacto/command-handler ::change!
   [_ [_ params] emit-cb]
-  (emit-cb [::anothered params]))
+  (emit-cb [::changed params]))
 
-(defmethod defacto/event-handler ::anothered
+(defmethod defacto/event-handler ::changed
   [db [_ result]]
   (assoc db ::something-else result))
 
-(defmethod defacto/query ::something-else?
+(defmethod defacto/query-handler ::something-else
   [db _]
   (::something-else db))
 
 (deftest DefactoStore-test
   (let [store (defacto/create {} {} atom)
-        result (defacto/subscribe store [::result?])
-        something-else (defacto/subscribe store [::something-else?])
+        result (defacto/subscribe store [::result])
+        something-else (defacto/subscribe store [::something-else])
         notifications (atom [])]
     (testing "when dispatching a command"
       (defacto/dispatch! store [::command! #{:apple :banana}])
@@ -50,7 +50,7 @@
 
         (testing "and when a state change does not change the query result"
           (reset! notifications [])
-          (defacto/dispatch! store [::another! {:some :value}])
+          (defacto/dispatch! store [::change! {:some :value}])
           (testing "processes the command"
             (is (= {:some :value} @something-else)))
 
