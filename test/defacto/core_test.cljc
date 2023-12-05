@@ -7,11 +7,11 @@
   [_ [_ params] emit-cb]
   (emit-cb [::commanded params]))
 
-(defmethod defacto/event-handler ::commanded
+(defmethod defacto/event-reducer ::commanded
   [db [_ result]]
   (assoc db ::result result))
 
-(defmethod defacto/query-handler ::result
+(defmethod defacto/query-responder ::result
   [db _]
   (::result db))
 
@@ -19,11 +19,11 @@
   [_ [_ params] emit-cb]
   (emit-cb [::changed params]))
 
-(defmethod defacto/event-handler ::changed
+(defmethod defacto/event-reducer ::changed
   [db [_ result]]
   (assoc db ::something-else result))
 
-(defmethod defacto/query-handler ::something-else
+(defmethod defacto/query-responder ::something-else
   [db _]
   (::something-else db))
 
@@ -36,6 +36,11 @@
       (defacto/dispatch! store [::command! #{:apple :banana}])
       (testing "processes updates"
         (is (= #{:apple :banana} @result))))
+
+    (testing "when emitting an event"
+      (defacto/emit! store [::commanded #{:orange :pineapple}])
+      (testing "processes updates"
+        (is (= #{:orange :pineapple} @result))))
 
     (testing "when watching a subscription"
       (add-watch result ::watch (fn [_ _ _ new]

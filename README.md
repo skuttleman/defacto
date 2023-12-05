@@ -1,6 +1,7 @@
 # defacto
 
-The `defacto` state store library. A lightweight, highly customizable state store for clojure(script).
+The `defacto` state store library. A [lightweight](https://github.com/skuttleman/defacto/blob/master/deps.edn),
+highly customizable state store for clojure(script).
 
 ## Usage
 
@@ -10,20 +11,22 @@ The `defacto` state store library. A lightweight, highly customizable state stor
 
 ;; make some command handlers
 (defmethod defacto/command-handler :stuff/create!
-  [{::defacto/keys [store] :as _ctx-map} _db-value [_ command-arg :as _command] emit-cb]
+  [{::defacto/keys [store] :as ctx-map} [_ command-arg :as _command] emit-cb]
+  (do-stuff! ctx-map command-arg)
+  ;; command handlers can do work synchronously and/or asynchronously
   (async/go
-    (do-stuff! ctx-map)
-    (defacto/dispatch! store [:another/command!])
-    (do-more-stuff! ctx-map)
-    (emit-cb [:stuff/created command-arg])))
+    (let [result (async/<! (do-more-stuff! ctx-map command-arg))]
+      (if (success? result)
+        (emit-cb [:stuff/created (async/<! (do-more-more-stuff! ctx-map command-arg))])
+        (defacto/dispatch! store [:another/command! result])))))
 
 ;; make some event handlers
-(defmethod defacto/event-handler :stuff/created
+(defmethod defacto/event-reducer :stuff/created
   [db [_ value :as _event]]
   (assoc db :stuff/value value))
 
 ;; make some subscription handlers
-(defmethod defacto/query-handler :stuff/stuff
+(defmethod defacto/query-responder :stuff/stuff
   [db [_ default]]
   (or (:stuff/value db) default))
 
@@ -38,15 +41,14 @@ The `defacto` state store library. A lightweight, highly customizable state stor
 ;; => 3
 
 ;; dispatch a command
-(dispatch! my-store [:stuff/create! 7])
+(defacto/dispatch! my-store [:stuff/create! 7])
 ;; value is updated in store
 (deref subscription)
 ;; => 7
 
 
-;; dispatch an event synchronously or asynchronously
-(dispatch my-store [::defacto/sync! [:some/event {...}]])
-(dispatch my-store [::defacto/async! [:some/event {...}]])
+;; emit an event directly
+(defacto/emit! my-store [:some/event {...}])
 ```
 
 The design is vaguely `CQS` (just like most state stores). As such, consider adopting a convention to help organize
@@ -60,7 +62,7 @@ which `keywords` you use for `commands`, `events`, or `queries`. Here is a conve
 
 ## Use with Reagent
 
-I love [reagent](https://github.com/reagent-project/reagent), and I use it for all my cljs projects. Making a
+I love [reagent](https://github.com/reagent-project/reagent), and I use it for all my cljs UIs. Making a
 reactive `reagent` store with `defacto` is super easy!
 
 ```clojure
@@ -87,9 +89,8 @@ reactive `reagent` store with `defacto` is super easy!
 
 (defn app-root []
   (r/with-let [store (defacto/create {:http-fn http/request} {:init :db} r/atom)]
-                                                                      ;; using [[r/atom]] gets you
+                                                                      ;; using [[r/atom]] gets you a
                                                                       ;; **reactive subscriptions**
-                                                                      ;; deref-ing the store is _NOT_ reactive
     [component store]))
 
 (rdom/render [app-root] (.getElementById js/document "root"))
@@ -101,26 +102,26 @@ reactive `reagent` store with `defacto` is super easy!
           ;; deref-ing the store is NOT reactive and can be used inside command handlers
           current-db @store
           ;; query the db directly instead of using subscriptions
-          page-data (defacto/query-handler current-db [::page-data])]
+          page-data (defacto/query-responder current-db [::page-data])]
       (do-something-with page-data)
       (if (= 200 (:status result))
         (emit-cb [::fetch-succeeded {:id id :data (:body result)}])
         (emit-cb [::fetch-failed {:id id :error (:body result)}])))))
 
-(defmethod defacto/event-handler ::fetch-succeeded
+(defmethod defacto/event-reducer ::fetch-succeeded
   [db [_ {:keys [id data]}]]
   (assoc-in db [:my-data id] {:status :ok :data data}))
 
-(defmethod defacto/event-handler ::fetch-failed
+(defmethod defacto/event-reducer ::fetch-failed
   [db [_ {:keys [id error]}]]
   (assoc-in db [:my-data id] {:status :bad :data error}))
 
-(defmethod defacto/query-handler ::page-data
+(defmethod defacto/query-responder ::page-data
   [db [_ id]]
   (get-in db [:my-data id]))
 ```
 
 ## Why?
 
-Good question. [re-frame](https://github.com/day8/re-frame) is awesome, but it's too heavy-weight for me. I prefer
-building things out of smaller things.
+Good question. [re-frame](https://github.com/day8/re-frame) is awesome, but it's too heavy-weight for my purposes.
+Sometimes I just want to build things out of tiny, composable pieces.
