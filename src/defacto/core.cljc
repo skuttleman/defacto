@@ -74,7 +74,7 @@
 
 (deftype DumbStore [ctx volatile-db]
   IDeref
-  (deref [_] @volatile-db)
+  (#?(:cljs -deref :default deref) [_] @volatile-db)
 
   IStore
   (-dispatch! [this command]
@@ -86,25 +86,26 @@
   (-subscribe [_ query]
     (reify
       IDeref
-      (deref [_] (query @volatile-db query))
+      (#?(:cljs -deref :default deref) [_] (query @volatile-db query))
 
-      IRef
-      (addWatch [this _ _] this)
-      (removeWatch [this _] this))))
+      #?@(:cljs    [IWatchable
+                    (-add-watch [this key f] this)
+                    (-remove-watch [this _] this)
+                    (-notify-watches [this _ _] this)]
+          :default [IRef
+                    (addWatch [this _ _] this)
+                    (removeWatch [this _] this)]))))
 
 (deftype ImmutableSubscription [sub]
-  #?@(:cljs    [IDeref
-                (-deref [_] @sub)
+  IDeref
+  (#?(:cljs -deref :default deref) [_] @sub)
 
-                IWatchable
+  #?@(:cljs    [IWatchable
                 (-add-watch [this key f] (add-watch* this sub key f))
                 (-remove-watch [_ key] (remove-watch sub key))
                 (-notify-watches [_ oldval newval] (-notify-watches sub oldval newval))]
 
-      :default [IDeref
-                (deref [_] @sub)
-
-                IRef
+      :default [IRef
                 (addWatch [this key f] (add-watch* this sub key f))
                 (removeWatch [_ key] (remove-watch sub key))]))
 
