@@ -1,7 +1,7 @@
 # defacto
 
 The `defacto` state store library. A [lightweight](https://github.com/skuttleman/defacto/blob/master/deps.edn),
-highly customizable state store for clojure(script).
+highly customizable state store for clojure(script). You've heard of **re-frame** or **redux**? Same patterns. New glue.
 
 ## Usage
 
@@ -17,7 +17,9 @@ highly customizable state store for clojure(script).
   (async/go
     (let [result (async/<! (do-more-stuff! ctx-map command-arg))]
       (if (success? result)
-        (emit-cb [:stuff/created (async/<! (do-more-more-stuff! ctx-map command-arg))])
+        (do
+          (async/<! (do-more-more-stuff! ctx-map command-arg))
+          (emit-cb [:stuff/created command-arg]))
         (defacto/dispatch! store [:another/command! result])))))
 
 ;; make some event handlers
@@ -36,28 +38,12 @@ highly customizable state store for clojure(script).
 
 ;; make a subscription
 (def subscription (defacto/subscribe my-store [:stuff/stuff 3]))
-(deref subscription)
-;; returns default value
-;; => 3
 
 ;; dispatch a command
 (defacto/dispatch! my-store [:stuff/create! 7])
-;; value is updated in store
-(deref subscription)
-;; => 7
 
-
-;; emit an event directly
+;; emit an event
 (defacto/emit! my-store [:some/event {...}])
-```
-
-The design is vaguely `CQS` (just like most state stores). As such, consider adopting a convention to help organize
-which `keywords` you use for `commands`, `events`, or `queries`. Here is a convention I like:
-
-```clojure
-[:some.domain/do-something! {...}] ;; `commands` are present-tense verbs ending with a `!`
-[:some.domain/something-happened {...}] ;; `events` are past-tense verbs
-[:some.domain/thing {...}] ;; `queries` are nouns
 ```
 
 ## Use with Reagent
@@ -87,10 +73,11 @@ reactive `reagent` store with `defacto` is super easy!
           :bad error
           "nothing yet")]])))
 
-(defn app-root []
+                                  ;; anything can go in the `ctx-map`, such
+(defn app-root []                 ;; as fns you may want to mock/stub in tests
   (r/with-let [store (defacto/create {:http-fn http/request} {:init :db} r/atom)]
-                                                                      ;; using [[r/atom]] gets you a
-                                                                      ;; **reactive subscriptions**
+                                                                      ;; using [[r/atom]] gets you
+                                                                      ;; **reactive subscriptions**!!
     [component store]))
 
 (rdom/render [app-root] (.getElementById js/document "root"))
@@ -101,7 +88,7 @@ reactive `reagent` store with `defacto` is super easy!
     (let [result (async/<! (http-fn {...}))
           ;; deref-ing the store is NOT reactive and can be used inside command handlers
           current-db @store
-          ;; query the db directly instead of using subscriptions
+          ;; then you can query the db directly instead of using reactive subscriptions
           page-data (defacto/query-responder current-db [::page-data])]
       (do-something-with page-data)
       (if (= 200 (:status result))
@@ -119,6 +106,57 @@ reactive `reagent` store with `defacto` is super easy!
 (defmethod defacto/query-responder ::page-data
   [db [_ id]]
   (get-in db [:my-data id]))
+```
+
+## Concepts
+
+The design is vaguely [CQS](https://en.wikipedia.org/wiki/Command%E2%80%93query_separation) (like most state stores).
+Here are the concepts and conventions that `defacto` uses.
+
+### Commands
+
+`command` - a message sent through `defacto` via `defacto.core/dispatch!`. It should be a vector with
+a keyword in first position. Prefer qualified keywords which are present-tense _verbs_ ending with a `!`.
+
+`action` - the keyword in first position of a `command` vector.
+
+`handler` - the implementation for handling a specific `command` `action`.
+
+```clojure
+;; example command
+[:my.domain/create-thing! {:thing :params}]
+```
+
+### Events
+
+`event` - message sent through `defacto` via a `command` (or `defacto.core/emit!` for convenience). It
+should be a vector with a keyword in first position. Prefer qualified keywords which are past-tense _verbs_.
+
+`event-type` - (aka `type`) is the keyword in first position of an `event` vector.
+
+`reducer` - the implementation for updating the db value in response to a specific `event` `type`. The `reducer`
+_must_ be a **pure function**.
+
+```clojure
+;; example event
+[:my.domain/thing-created {:thing :details}]
+```
+
+### Queries
+
+`query` - a message used to request data from `defacto`'s database. It should be a vector
+with a keyword in first position. Prefer qualified keywords which are _nouns_.
+
+`resource` - the keyword in first position of a `query` vector.
+
+`responder` - the implementation for finding data in the db relevant to a specific `query` `resource`. The `responder`
+_must_ be a **pure function**.
+
+`subscription` - a deref-able, watch-able ref type that will update when the result of a query changes.
+
+```clojure
+;; example query
+[:my.domain/thing {:id 123}]
 ```
 
 ## Why?
