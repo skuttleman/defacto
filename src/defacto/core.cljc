@@ -1,4 +1,6 @@
 (ns defacto.core
+  (:require
+    [clojure.walk :as walk])
   #?(:clj
      (:import
        (clojure.lang IDeref IRef))))
@@ -55,6 +57,10 @@
              (get-in db [...]))
            ```"
           (fn [_ [resource]] resource))
+
+(defprotocol IInitialize
+  "Extend this protocol to have components in your `ctx-map` get initialized with the store upon creation."
+  (init! [_ store]))
 
 (defn ^:private add-watch* [store sub key f]
   (add-watch sub key (fn [key _ old new]
@@ -146,7 +152,8 @@
 
    `ctx-map`          - any arbitrary map of clojure data. keys with the namespace
                         `defacto*` (i.e. `:defacto.whatever/some-key`) are reserved
-                        for use by this library.
+                        for use by this library. Any node in the `ctx-map` that satisfies
+                        [[IInitialize]] will be initialized with the store upon creation.
 
    `init-db`          - the initial value of your db.
 
@@ -167,8 +174,14 @@
   ([ctx-map init-db]
    (create ctx-map init-db atom))
   ([ctx-map init-db ->sub]
-   (let [base-store (->WatchableStore ctx-map (atom init-db) false)]
-     (->DefactoStore base-store (->query-cached-sub-fn ->sub)))))
+   (let [base-store (->WatchableStore ctx-map (atom init-db) false)
+         store (->DefactoStore base-store (->query-cached-sub-fn ->sub))]
+     (walk/postwalk (fn [x]
+                      (when (satisfies? IInitialize x)
+                        (init! x store))
+                      x)
+                    ctx-map)
+     store)))
 
 (defn dispatch!
   "Dispatches a `command` through the store. The `command` should be a vector with a keyword in

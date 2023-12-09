@@ -97,7 +97,9 @@ reactive `reagent` store with `defacto` is super easy!
 
 (defmethod defacto/event-reducer ::fetch-succeeded
   [db [_ {:keys [id data]}]]
-  (assoc-in db [:my-data id] {:status :ok :data data}))
+                     ;; query the db from events or other queries
+  (let [current-data (defacto/query-responder db [::page-data id])]
+    (assoc-in db [:my-data id] (merge current-data {:status :ok :data data}))))
 
 (defmethod defacto/event-reducer ::fetch-failed
   [db [_ {:keys [id error]}]]

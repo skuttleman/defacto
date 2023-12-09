@@ -60,4 +60,13 @@
             (is (= {:some :value} @something-else)))
 
           (testing "does not notify the watcher"
-            (is (empty? @notifications))))))))
+            (is (empty? @notifications))))))
+
+    (testing "when including an initializer in the context map"
+      (let [store-prom (promise)
+            store (defacto/create {:my-component (reify
+                                                   defacto/IInitialize
+                                                   (init! [_ store] (deliver store-prom store)))}
+                                  nil)]
+        (testing "initializes the component"
+          (is (= store @store-prom)))))))
