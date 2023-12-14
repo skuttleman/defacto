@@ -1,0 +1,4 @@
+{:paths   ["src"]
+ :deps    {org.clojure/core.async {:mvn/version "1.6.673"}
+           skuttleman/defacto     {:local/root "../.."}}
+ :aliases {:dev {org.clojure/clojurescript {:mvn/version "1.10.844"}}}}
