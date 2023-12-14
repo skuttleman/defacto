@@ -2,7 +2,6 @@
   (:require
     [clojure.core.async :as async]
     [clojure.core.async.impl.protocols :as iasync]
-    [clojure.pprint :as pp]
     [defacto.core :as defacto]))
 
 (defn ^:private safely! [request-fn & args]
