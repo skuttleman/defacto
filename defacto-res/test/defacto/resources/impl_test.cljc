@@ -4,6 +4,7 @@
     [clojure.core.async :as async]
     [defacto.core :as defacto]
     [defacto.test.utils :as tu]
+    [defacto.resources.core :as res]
     [defacto.resources.impl :as impl]))
 
 (def ^:private fixture
@@ -47,7 +48,7 @@
                                                              (async/go
                                                                (reset! commands [])
                                                                (reset! events [])
-                                                               [:ok {:some :data}])))]
+                                                               [::res/ok {:some :data}])))]
               (impl/request! ctx-map fixture emit-cb)
               (async/<! (async/timeout 5))
               (testing "emits ok-events"
@@ -65,7 +66,7 @@
                                                              (async/go
                                                                (reset! commands [])
                                                                (reset! events [])
-                                                               [:err {:some :err}])))]
+                                                               [::res/err {:some :err}])))]
               (impl/request! ctx-map fixture emit-cb)
               (async/<! (async/timeout 5))
               (testing "emits err-events"

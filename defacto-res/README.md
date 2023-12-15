@@ -24,9 +24,9 @@ A module for `defacto` that generically handles "asynchronous" resources.
     ;; does whatever, http prolly
     ...
     ;; succeeds with a vector tuple
-    [:ok {:some :data}] ;; if it isn't `:ok`, it's an `:err`
+    [::res/ok {:some :data}] ;; if it isn't `::res/ok`, it's an `::res/err`
     ;; or fails with a vector tuple
-    [:err {:some :error}]))
+    [::res/err {:some :error}]))
 
 
 ;; resource key

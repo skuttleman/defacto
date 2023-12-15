@@ -38,7 +38,7 @@
             ch (->ch (safely! request-fn resource-type params))]
         (async/go
           (let [[status payload] (->result (async/<! ch))
-                [events commands] (if (= :ok status)
+                [events commands] (if (= :defacto.resources.core/ok status)
                                     [ok-events ok-commands]
                                     [err-events err-commands])]
             (send-all emit-cb events payload)

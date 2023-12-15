@@ -24,7 +24,7 @@
       (let [calls (atom [])
             request-fn (fn [_ req]
                          (swap! calls conj [::request-fn req])
-                         [:ok {:some :data}])
+                         [::res/ok {:some :data}])
             store (defacto/create {:defacto.resources.impl/request-fn request-fn} nil)]
         (testing "when ensuring the resource exists"
           (testing "and when the resource does not exist"
