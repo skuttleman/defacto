@@ -9,10 +9,7 @@
           (fn [resource-key _form-data]
             (first resource-key)))
 
-(defmethod res/->request-spec ::std
-  [[_ resource-key] params]
-  (res/->request-spec resource-key (dissoc params ::forms/form)))
-
+;; forms
 (defmethod res/->request-spec ::post
   [[_ resource-key :as form-key] {::forms/keys [form] :as params}]
   (let [form-data (forms/data form)]
@@ -28,9 +25,16 @@
 ;; commands
 (defmethod defacto/command-handler ::submit!
   [{::defacto/keys [store]} [_ form-key params] _]
-  (let [form (defacto/query-responder @store [::forms/?:form form-key])]
-    (defacto/dispatch! store [::res/submit! form-key (assoc params ::forms/form form)])))
+  (let [form (defacto/query-responder @store [::forms/?:form form-key])
+        params (cond-> params form (assoc ::forms/form form))]
+    (defacto/dispatch! store [::res/submit! form-key params])))
 
+
+;; queries
+(defmethod defacto/query-responder ::?:form+
+  [db [_ form-key]]
+  (merge (defacto/query-responder db [::forms/?:form form-key])
+         (defacto/query-responder db [::res/?:resource form-key])))
 
 ;; events
 (defmethod defacto/event-reducer ::destroyed
