@@ -43,10 +43,16 @@
   (::opts form))
 
 (defn data
-  "Extract the canonical model of data from the form."
+  "Extract the canonical model of data of the form."
   [form]
   (when form
     (nest (::current form))))
+
+(defn initial
+  "Extract the canonical model of initial value of the form."
+  [form]
+  (when form
+    (nest (::init form))))
 
 (defn change
   "Changes a value of a form at a path.
@@ -92,18 +98,18 @@
 ;; queries
 (defmethod defacto/query-responder ::?:form
   [db [_ form-id]]
-  (get-in db [::forms form-id]))
+  (get-in db [::-forms form-id]))
 
 
 ;; events
 (defmethod defacto/event-reducer ::created
   [db [_ form-id data opts]]
-  (assoc-in db [::forms form-id] (create form-id data opts)))
-
-(defmethod defacto/event-reducer ::destroyed
-  [db [_ form-id]]
-  (update db ::forms dissoc form-id))
+  (assoc-in db [::-forms form-id] (create form-id data opts)))
 
 (defmethod defacto/event-reducer ::changed
   [db [_ form-id path value]]
-  (update-in db [::forms form-id] change path value))
+  (update-in db [::-forms form-id] change path value))
+
+(defmethod defacto/event-reducer ::destroyed
+  [db [_ form-id]]
+  (update db ::-forms dissoc form-id))

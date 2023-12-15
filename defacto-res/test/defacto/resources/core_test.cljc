@@ -138,7 +138,7 @@
 
           (testing "and when the resource is unknown"
             (testing "and when querying the resource"
-              (let [resource (defacto/query-responder @store [::res/?:resource ::none])]
+              (let [resource (defacto/query-responder @store [::res/?:resource [::none]])]
                 (testing "returns an initialized resource"
                   (is (nil? resource)))))))
 
