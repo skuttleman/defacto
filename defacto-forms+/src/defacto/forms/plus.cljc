@@ -9,6 +9,15 @@
           (fn [resource-key _form-data]
             (first resource-key)))
 
+(defmulti ->next-init
+          (fn [resource-key _form _res-data]
+            (first resource-key)))
+
+(defmethod ->next-init :default
+  [_ form _res-data]
+  (forms/initial form))
+
+
 ;; forms
 (defmethod res/->request-spec ::post
   [[_ resource-key :as form-key] {::forms/keys [form] :as params}]
@@ -18,8 +27,7 @@
       (-> (res/->request-spec resource-key (assoc params ::forms/data form-data))
           (update :ok-events conj
                   [::res/destroyed form-key]
-                  [::forms/created form-key (forms/initial form) (forms/opts form)])))))
-
+                  [::recreated form-key form])))))
 
 
 ;; commands
@@ -36,7 +44,13 @@
   (merge (defacto/query-responder db [::forms/?:form form-key])
          (defacto/query-responder db [::res/?:resource form-key])))
 
+
 ;; events
+(defmethod defacto/event-reducer ::recreated
+  [db [_ [_ resource-key :as form-key] form result]]
+  (let [next-init (->next-init resource-key form result)]
+    (defacto/event-reducer db [::forms/created form-key next-init (forms/opts form)])))
+
 (defmethod defacto/event-reducer ::destroyed
   [db [_ form-key]]
   (-> db
