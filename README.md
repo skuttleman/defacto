@@ -1,6 +1,6 @@
 # defacto
 
-The `defacto` state store library. A [lightweight](https://github.com/skuttleman/defacto/blob/master/deps.edn),
+The `defacto` state store library. A [lightweight](https://github.com/skuttleman/defacto/blob/master/core/deps.edn),
 highly customizable state store for clojure(script). You've heard of **re-frame** or **redux**? Same patterns. New glue.
 
 ```clojure
