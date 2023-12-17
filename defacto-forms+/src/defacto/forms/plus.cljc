@@ -1,33 +1,38 @@
 (ns defacto.forms.plus
-  "Additional form facilities that will only work if you are also using [[defacto.resources.core]]"
+  "Additional form facilities that combine [[defacto.forms.core]] and [[defacto.resources.core]]"
   (:require
     [defacto.core :as defacto]
     [defacto.forms.core :as forms]
     [defacto.resources.core :as res]))
 
-(defmulti validate
+(defmulti ^{:arglists '([resource-key form resource-payload])} re-init
+          "Extend this multimethod to define how your form is reinitialize upon
+           successful submission. Defaults to the initial form value."
+          (fn [resource-key _ _]
+            (first resource-key)))
+
+(defmulti ^{:arglists '([resource-key form-data])} validate
+          "Extend this multimethod for `::valid` forms. Your validator should
+           return `nil` when valid, or an appropriate data structure to represent
+           form errors."
           (fn [resource-key _form-data]
             (first resource-key)))
 
-(defmulti ->next-init
-          (fn [resource-key _form _res-data]
-            (first resource-key)))
-
-(defmethod ->next-init :default
-  [_ form _res-data]
-  (forms/initial form))
-
 
 ;; forms
-(defmethod res/->request-spec ::post
+(defmethod res/->request-spec ::std
+  [[_ resource-key :as form-key] {::forms/keys [form] :as params}]
+  (let [form-data (forms/data form)]
+    (-> (res/->request-spec resource-key (assoc params ::forms/data form-data))
+        (update :ok-events conj [::recreated form-key form]))))
+
+(defmethod res/->request-spec ::valid
   [[_ resource-key :as form-key] {::forms/keys [form] :as params}]
   (let [form-data (forms/data form)]
     (if-let [errors (validate resource-key form-data)]
       {:pre-events [[::res/failed form-key {::forms/errors errors}]]}
       (-> (res/->request-spec resource-key (assoc params ::forms/data form-data))
-          (update :ok-events conj
-                  [::res/destroyed form-key]
-                  [::recreated form-key form])))))
+          (update :ok-events conj [::recreated form-key form])))))
 
 
 ;; commands
@@ -48,7 +53,7 @@
 ;; events
 (defmethod defacto/event-reducer ::recreated
   [db [_ [_ resource-key :as form-key] form result]]
-  (let [next-init (->next-init resource-key form result)]
+  (let [next-init (re-init resource-key form result)]
     (defacto/event-reducer db [::forms/created form-key next-init (forms/opts form)])))
 
 (defmethod defacto/event-reducer ::destroyed
@@ -56,3 +61,9 @@
   (-> db
       (defacto/event-reducer [::forms/destroyed form-key])
       (defacto/event-reducer [::res/destroyed form-key])))
+
+
+;; internal
+(defmethod re-init :default
+  [_ form _]
+  (forms/initial form))
