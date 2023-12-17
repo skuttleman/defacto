@@ -1,2 +1,2 @@
-{:deps    {skuttleman/defacto-core {:local/root "defacto-core"}}
+{:deps    {skuttleman/defacto-core {:local/root "core"}}
  :aliases {:dev {org.clojure/clojurescript {:mvn/version "1.10.844"}}}}

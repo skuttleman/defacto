@@ -10,7 +10,7 @@
     "Dispatches a `command` through the system causing potential side-effects and/or emmitting `events`
      which update the internal db.")
   (-subscribe [this query]
-    "Returns a deref-able and watchable subscription to a `query` implemented by [[query-responder]].
+    "Returns a deref-able and watchable subscription to a `query`.
      The subscription should be updated any time the query results change."))
 
 (defn ^:private add-watch* [store sub key f]

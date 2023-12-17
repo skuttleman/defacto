@@ -3,6 +3,12 @@
 The `defacto` state store library. A [lightweight](https://github.com/skuttleman/defacto/blob/master/deps.edn),
 highly customizable state store for clojure(script). You've heard of **re-frame** or **redux**? Same patterns. New glue.
 
+```clojure
+;; deps.edn
+{:deps {skuttleman/defacto {:git/url "https://github.com/skuttleman/defacto"
+                            :git/sha "{SHA_OF_HEAD}"}}}
+```
+
 ## Usage
 
 ```clojure
@@ -28,7 +34,7 @@ highly customizable state store for clojure(script). You've heard of **re-frame*
   (assoc db :stuff/value value))
 
 ;; make some subscription handlers
-(defmethod defacto/query-responder :stuff/?:stuff
+(defmethod defacto/query-responder :stuff/?:value
   [db [_ default]]
   (or (:stuff/value db) default))
 
@@ -37,7 +43,7 @@ highly customizable state store for clojure(script). You've heard of **re-frame*
 (def my-store (defacto/create {:some :ctx} {:stuff/value nil}))
 
 ;; make a subscription
-(def subscription (defacto/subscribe my-store [:stuff/?:stuff 3]))
+(def subscription (defacto/subscribe my-store [:stuff/?:value 3]))
 
 ;; dispatch a command
 (defacto/dispatch! my-store [:stuff/create! 7])
@@ -110,6 +116,16 @@ reactive `reagent` store with `defacto` is super easy!
   (get-in db [:my-data id]))
 ```
 
+## Modules
+
+`defacto` uses a "plugin" architecture so functionality can be extended by including modules. Here are a few to get
+you started.
+
+- [defacto-forms+](forms+/README.md) - this combines `defacto-res` and `defacto-forms` to help you link user-input with
+an asynchronous resource.
+- [defacto-res](res/README.md) - a low-level module for managing asynchronous "resources" in your state store
+- [defacto-forms](forms/README.md) - a simple isolation layer for managing arbitrary user-input
+
 ## Concepts
 
 The design is vaguely [CQS](https://en.wikipedia.org/wiki/Command%E2%80%93query_separation) (like most state stores).
@@ -117,12 +133,14 @@ Here are the concepts and conventions that `defacto` uses.
 
 ### Commands
 
-`command` - a message "dispatched" through `defacto` via `defacto.core/dispatch!`. It should be a vector with
-a keyword in first position. Prefer qualified keywords which are _present-tense verbs_ ending with a `!`.
+`command` - a message "dispatched" through a `defacto` store via `defacto.core/dispatch!`. Commands are the primary
+mechanism for "getting stuff done". They can cause any side effect you need (such as emitting events). A `command`
+should be a vector with a *keyword* in first position. Prefer qualified keywords which are _present-tense verbs_
+ending with a `!`.
 
-`action` - the keyword in first position of a `command` vector.
+`action` - the *keyword* in first position of a `command` vector.
 
-`handler` - the implementation for handling a specific `command` `action`.
+`handler` - the implementation for responding to a specific `command` `action`.
 
 ```clojure
 ;; example command
@@ -131,10 +149,11 @@ a keyword in first position. Prefer qualified keywords which are _present-tense 
 
 ### Events
 
-`event` - a message "emitted" through `defacto` via dispatching a `command` (or `defacto.core/emit!` for convenience).
-It should be a vector with a keyword in first position. Prefer qualified keywords which are _past-tense verbs_.
+`event` - a message "emitted" through a `defacto` store via dispatching a `command` (or `defacto.core/emit!` for convenience).
+Events are the only way to update `defacto`'s internal db. An `event` should be a vector with a *keyword* in first position.
+Prefer qualified keywords which are _past-tense verbs_.
 
-`event-type` - (aka `type`) is the keyword in first position of an `event` vector.
+`event-type` - (aka `type`) is the *keyword* in first position of an `event` vector.
 
 `reducer` - the implementation for updating the db value in response to a specific `event` `type`. The `reducer`
 _must_ be a **pure function**.
@@ -146,11 +165,11 @@ _must_ be a **pure function**.
 
 ### Queries
 
-`query` - a message used to request data from `defacto`'s database. It should be a vector
-with a keyword in first position. Prefer qualified keywords which are _nouns_. I like prefixing the *name* with `?:`
-to make them stand out more in code.
+`query` - a message used to request data from `defacto`'s internal db. They can be used to *subscribe* to the internal
+db's updates. A `query` should be a vector with a *keyword* in first position. Prefer qualified keywords which are
+_nouns_. I like prefixing the *name* with `?:` to make them stand out more in code and autocomplete in my editor.
 
-`resource` - the keyword in first position of a `query` vector.
+`resource` - the *keyword* in first position of a `query` vector.
 
 `responder` - the implementation for finding data in the db relevant to a specific `query` `resource`. The `responder`
 _must_ be a **pure function**.
@@ -183,5 +202,5 @@ sequenceDiagram
 
 ## Why?
 
-Good question. [re-frame](https://github.com/day8/re-frame) is awesome, but it's too heavy-weight for my purposes.
+Good question. [re-frame](https://github.com/day8/re-frame) is awesome, but it's usually too heavy-weight for my purposes.
 Sometimes I just want to build things out of tiny, composable pieces.

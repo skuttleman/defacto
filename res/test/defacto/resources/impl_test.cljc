@@ -106,7 +106,7 @@
               (let [ctx-map (assoc ctx-map ::impl/request-fn (fn [_ _]
                                                                (reset! commands [])
                                                                (reset! events [])
-                                                               [:ok {:some :data}]))]
+                                                               [::res/ok {:some :data}]))]
                 (impl/request! ctx-map fixture emit-cb)
                 (async/<! (async/timeout 5))
                 (testing "emits ok-events"

@@ -103,38 +103,38 @@
             (defacto/dispatch! store [::res/submit! [::resource 123]])
             (defacto/emit! store [::res/succeeded [::resource 123] {:some :data}])
             (testing "and when querying the resource"
-              (let [{:keys [payload status]} (defacto/query-responder @store [::res/?:resource [::resource 123]])]
+              (let [resource (defacto/query-responder @store [::res/?:resource [::resource 123]])]
                 (testing "returns the successful resource"
-                  (is (= :success status))
-                  (is (= {:some :data} payload))))))
+                  (is (res/success? resource))
+                  (is (= {:some :data} (res/payload resource)))))))
 
           (testing "and when the resource is unknown"
             (defacto/emit! store [::res/destroyed [::resource 123]])
             (defacto/emit! store [::res/succeeded [::resource 123] {:some :data}])
             (testing "and when querying the resource"
-              (let [{:keys [payload status]} (defacto/query-responder @store [::res/?:resource [::resource 123]])]
+              (let [resource (defacto/query-responder @store [::res/?:resource [::resource 123]])]
                 (testing "returns an initialized resource"
-                  (is (= :init status))
-                  (is (nil? payload)))))))
+                  (is (res/init? resource))
+                  (is (nil? (res/payload resource))))))))
 
         (testing "when a resource fails"
           (testing "and when the resource is submitted"
             (defacto/dispatch! store [::res/submit! [::resource 123]])
             (defacto/emit! store [::res/failed [::resource 123] {:some :data}])
             (testing "and when querying the resource"
-              (let [{:keys [payload status]} (defacto/query-responder @store [::res/?:resource [::resource 123]])]
+              (let [resource (defacto/query-responder @store [::res/?:resource [::resource 123]])]
                 (testing "returns the successful resource"
-                  (is (= :error status))
-                  (is (= {:some :data} payload))))))
+                  (is (res/error? resource))
+                  (is (= {:some :data} (res/payload resource)))))))
 
           (testing "and when the resource is unsubmitted"
             (defacto/emit! store [::res/destroyed [::resource 123]])
             (defacto/emit! store [::res/failed [::resource 123] {:some :data}])
             (testing "and when querying the resource"
-              (let [{:keys [payload status]} (defacto/query-responder @store [::res/?:resource [::resource 123]])]
+              (let [resource (defacto/query-responder @store [::res/?:resource [::resource 123]])]
                 (testing "returns an initialized resource"
-                  (is (= :init status))
-                  (is (nil? payload))))))
+                  (is (res/init? resource))
+                  (is (nil? (res/payload resource)))))))
 
           (testing "and when the resource is unknown"
             (testing "and when querying the resource"

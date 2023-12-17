@@ -1,0 +1,2 @@
+{:paths ["src"]
+ :deps  {skuttleman/defacto {:local/root "../core"}}}

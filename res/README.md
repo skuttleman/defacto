@@ -3,6 +3,13 @@
 A module for `defacto` that generically handles "asynchronous" resources.
 
 ```clojure
+;; deps.edn
+{:deps {skuttleman/defacto-res {:git/url   "https://github.com/skuttleman/defacto"
+                                :git/sha   "{SHA_OF_HEAD}"
+                                :deps/root "res"}}}
+```
+
+```clojure
 (ns killer-app.core
   (:require
     [defacto.core :as defacto]
@@ -11,11 +18,11 @@ A module for `defacto` that generically handles "asynchronous" resources.
 ;; define your resource spec by returning a map by including any of the following
 (defmethod res/->resource-spec ::fetch-thing
   [_ input]
-  {:pre-events [[::fetch-started]]
-   :params {:request-method :get
-            :url            (str "http://www.example.com/things/" (:id input))}
+  {:pre-events   [[::fetch-started]]
+   :params       {:request-method :get
+                  :url            (str "http://www.example.com/things/" (:id input))}
    :err-commands [[::toast!]]
-   :ok-events ...})
+   :ok-events    ...})
 
 ;; define a request-fn
 (defn my-request-fn [resource-type params]
@@ -24,7 +31,7 @@ A module for `defacto` that generically handles "asynchronous" resources.
     ;; does whatever, http prolly
     ...
     ;; succeeds with a vector tuple
-    [::res/ok {:some :data}] ;; if it isn't `::res/ok`, it's an `::res/err`
+    [::res/ok {:some :data}] ;; if it isn't `::res/ok`, it's `::res/err`
     ;; or fails with a vector tuple
     [::res/err {:some :error}]))
 
@@ -38,36 +45,26 @@ A module for `defacto` that generically handles "asynchronous" resources.
 
 ;; submit the resource
 (defacto/dispatch! store [::res/submit! resource-key {:id 123}])
-@sub ;; => {:status :requesting ...}
+(res/requesting? @sub) ;; => true
 ... after the request finishes
-@sub ;; => {:status :success :payload ...}
+(res/success? @sub) ;; true (one would hope)
+(res/payload @sub) ;; => {...}
 ```
 
 ## What's a resource?
-
-A `resource` is anything that can be interacted with via a simple asynchronous request/response model. Some example
-use-cases might be an `HTTP` request, `database` call, or - in a browser - `localstorage`. A `resource`'s value
-will have the following keys:
-
-- `:state` - enum of `#{:init :requesting :success :error}`
-  - `:init` - not yet requested (or subsequently destroyed)
-  - `:requesting` - actively processing its request
-  - `:success` - finished processing with a "success" status
-  - `:error` - finished processing with an "error" status
-- `:payload` (optional) - the data associated with the most recent request
-- `:params` (optional) - the last params used to request the resource, if any
 
 A `resource` is defined by extending [[defacto.resources.core/->resource-spec]] with your `resource-type` which
 you can use to create and reference resources in the system.
 
 ```clojure
-(defmethod defacto.resources.core/->request-spec ::my-resource-type
-  [resource-key input]
+(defmethod defacto.resources.core/->request-spec ::resource-type
+  [resource-key input] ;; resource-key is a vector beginning with the `resource-type`
   {:params {...}
    ...})
 ```
 
 Your spec can return any of the following keys
+
 - `:params` - a NON-`nil` argument to request the resource. If this key is `nil`, the resource will not be requested.
 - `:pre-events`, `:pre-command` - optional sequences of events/commands to be emitted/dispatched before the request
   is submitted. These occur even if `:params` is `nil`
@@ -80,36 +77,35 @@ Your spec can return any of the following keys
 
 ## Commands
 
-This module exposes the following commands.
+This module exposes the following `commands`.
 
 ### [::res/submit! resource-key params]
 
 This submits a resource with the provided params.
 
 ```clojure
-(defacto/dispatch! store [::res/submit! ::resource-type {:a 1}])
+(defacto/dispatch! store [::res/submit! [::resource-type] {:a 1}])
 ```
 
 ### [::res/ensure! resource-key params]
 
 This submits a resource if it is currently in the `:init` state.
 
-
 ```clojure
-(defacto/dispatch! store [::res/ensure! ::resource-type {:a 1}])
+(defacto/dispatch! store [::res/ensure! [::resource-type] {:a 1}])
 ```
 
 ### [::res/sync! resource-key params]
 
-This submits a resource if it is in the `:init` state or the request `params` are different
+This submits a resource if it is in the `:init` state (i.e. un-submitted) or the request `params` are different
 from the previous submission's `params`.
 
 ```clojure
-(defacto/dispatch! store [::res/sync! ::resource-type {:a 1}])
+(defacto/dispatch! store [::res/sync! [::resource-type] {:a 1}])
 ;; submits resource
-(defacto/dispatch! store [::res/sync! ::resource-type {:a 1}])
+(defacto/dispatch! store [::res/sync! [::resource-type] {:a 1}])
 ;; does not submit resource
-(defacto/dispatch! store [::res/sync! ::resource-type {:a 2}])
+(defacto/dispatch! store [::res/sync! [::resource-type] {:a 2}])
 ;; submits resource
 ```
 
@@ -119,9 +115,9 @@ Continuously submits a resource in intervals of `milliseconds`.
 
 ```clojure
 ;; sends a request now, and after every 2 seconds forever
-(defacto/dispatch! store [::res/poll! 2000 ::resource-type {:a 1}])
+(defacto/dispatch! store [::res/poll! 2000 [::resource-type] {:a 1}])
 ;; destroy the resource to stop the polling
-(defacto/emit! store [::res/destroyed ::resource-type])
+(defacto/emit! store [::res/destroyed [::resource-type]])
 ```
 
 ### [::res/delay! milliseconds command]
@@ -134,34 +130,37 @@ Executes a command after `milliseconds` have expired.
 
 ## Queries
 
+This module exposes the following `queries`.
+
 ### [::res/?:resource resource-key]
 
 Retrieves the current state of a resource.
 
 ```clojure
 @(defacto/subscribe store [::res/?:resource [::some-key 123]])
-;; =? {:status :init}
-;; returns `nil` for unknown resources
+;; returns `nil` for undefined resources
 ```
 
 ## Events
 
-### [::submitted resource-key request-params]
+This module exposes the following `events`.
 
-Transitions the request from any state to `:requesting`. **Not intended to be used directly**
+### [::res/submitted resource-key request-params]
 
-### [::succeeded resource-key data]
+Transitions the resource from any state to `:requesting`. **Not intended to be used directly**
 
-Transitions the request from a `:requesting` state to a `:success` state. **Not intended to be used directly**
+### [::res/succeeded resource-key data]
 
-### [::failed resource-key error]
+Transitions the resource from a `:requesting` state to a `:success` state. **Not intended to be used directly**
 
-Transitions the request from a `:requesting` state to an `:error` state. **Not intended to be used directly**
+### [::res/failed resource-key error]
 
-### [::destroyed resource-key]
+Transitions the resource from a `:requesting` state to an `:error` state. **Not intended to be used directly**
+
+### [::res/destroyed resource-key]
 
 Destroys a resource.
 
 ```clojure
-(defacto/emit! store [::res/destroyed ::resource-type])
+(defacto/emit! store [::res/destroyed [::resource-type]])
 ```

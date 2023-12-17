@@ -1,0 +1,4 @@
+{:deps {skuttleman/defacto       {:local/root "../core"}
+        skuttleman/defacto-forms {:local/root "../forms"}
+        skuttleman/defacto-res   {:local/root "../res"}}}
+
