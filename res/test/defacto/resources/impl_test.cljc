@@ -20,7 +20,9 @@
    :err-events   [[::erred-1]
                   [::erred-2]]
    :err-commands [[::err-1!]
-                  [::err-2!]]})
+                  [::err-2!]]
+   :->ok         vector
+   :->err        (partial conj #{})})
 
 (deftest request!-test
   (tu/async done
@@ -52,13 +54,13 @@
               (impl/request! ctx-map fixture emit-cb)
               (async/<! (async/timeout 5))
               (testing "emits ok-events"
-                (is (= [[::oked-1 {:some :data}]
-                        [::oked-2 {:some :data}]]
+                (is (= [[::oked-1 [{:some :data}]]
+                        [::oked-2 [{:some :data}]]]
                        @events)))
 
               (testing "dispatches ok-commands"
-                (is (= [[::ok-1! {:some :data}]
-                        [::ok-2! {:some :data}]]
+                (is (= [[::ok-1! [{:some :data}]]
+                        [::ok-2! [{:some :data}]]]
                        @commands)))))
 
           (testing "and when the request fails"
@@ -70,13 +72,13 @@
               (impl/request! ctx-map fixture emit-cb)
               (async/<! (async/timeout 5))
               (testing "emits err-events"
-                (is (= [[::erred-1 {:some :err}]
-                        [::erred-2 {:some :err}]]
+                (is (= [[::erred-1 #{{:some :err}}]
+                        [::erred-2 #{{:some :err}}]]
                        @events)))
 
               (testing "dispatches err-commands"
-                (is (= [[::err-1! {:some :err}]
-                        [::err-2! {:some :err}]]
+                (is (= [[::err-1! #{{:some :err}}]
+                        [::err-2! #{{:some :err}}]]
                        @commands)))))
 
           (testing "and when the request-fn does not return a vector"
@@ -88,17 +90,17 @@
               (impl/request! ctx-map fixture emit-cb)
               (async/<! (async/timeout 5))
               (testing "emits err-events"
-                (is (= [[::erred-1 {:result {:some :data}
-                                    :reason "request-fn must return a vector"}]
-                        [::erred-2 {:result {:some :data}
-                                    :reason "request-fn must return a vector"}]]
+                (is (= [[::erred-1 #{{:result {:some :data}
+                                      :reason "request-fn must return a vector"}}]
+                        [::erred-2 #{{:result {:some :data}
+                                      :reason "request-fn must return a vector"}}]]
                        @events)))
 
               (testing "dispatches err-commands"
-                (is (= [[::err-1! {:result {:some :data}
-                                   :reason "request-fn must return a vector"}]
-                        [::err-2! {:result {:some :data}
-                                   :reason "request-fn must return a vector"}]]
+                (is (= [[::err-1! #{{:result {:some :data}
+                                     :reason "request-fn must return a vector"}}]
+                        [::err-2! #{{:result {:some :data}
+                                     :reason "request-fn must return a vector"}}]]
                        @commands)))))
 
           (testing "and when the request-fn does not return a channel"
@@ -110,13 +112,13 @@
                 (impl/request! ctx-map fixture emit-cb)
                 (async/<! (async/timeout 5))
                 (testing "emits ok-events"
-                  (is (= [[::oked-1 {:some :data}]
-                          [::oked-2 {:some :data}]]
+                  (is (= [[::oked-1 [{:some :data}]]
+                          [::oked-2 [{:some :data}]]]
                          @events)))
 
                 (testing "dispatches ok-commands"
-                  (is (= [[::ok-1! {:some :data}]
-                          [::ok-2! {:some :data}]]
+                  (is (= [[::ok-1! [{:some :data}]]
+                          [::ok-2! [{:some :data}]]]
                          @commands)))))
 
             (testing "and when the request fails"
@@ -127,17 +129,17 @@
                 (impl/request! ctx-map fixture emit-cb)
                 (async/<! (async/timeout 5))
                 (testing "emits err-events"
-                  (is (= [[::erred-1 {:result {:some :data}
-                                      :reason "request-fn must return a vector"}]
-                          [::erred-2 {:result {:some :data}
-                                      :reason "request-fn must return a vector"}]]
+                  (is (= [[::erred-1 #{{:result {:some :data}
+                                        :reason "request-fn must return a vector"}}]
+                          [::erred-2 #{{:result {:some :data}
+                                        :reason "request-fn must return a vector"}}]]
                          @events)))
 
                 (testing "dispatches err-commands"
-                  (is (= [[::err-1! {:result {:some :data}
-                                     :reason "request-fn must return a vector"}]
-                          [::err-2! {:result {:some :data}
-                                     :reason "request-fn must return a vector"}]]
+                  (is (= [[::err-1! #{{:result {:some :data}
+                                       :reason "request-fn must return a vector"}}]
+                          [::err-2! #{{:result {:some :data}
+                                       :reason "request-fn must return a vector"}}]]
                          @commands))))))
 
           (testing "and when the request-fn throws an exception"
@@ -149,16 +151,16 @@
               (impl/request! ctx-map fixture emit-cb)
               (async/<! (async/timeout 5))
               (testing "emits err-events"
-                (is (= [[::erred-1 {:exception ex
-                                    :reason    "request-fn threw an exception"}]
-                        [::erred-2 {:exception ex
-                                    :reason    "request-fn threw an exception"}]]
+                (is (= [[::erred-1 #{{:exception ex
+                                      :reason    "request-fn threw an exception"}}]
+                        [::erred-2 #{{:exception ex
+                                      :reason    "request-fn threw an exception"}}]]
                        @events)))
 
               (testing "dispatches err-commands"
-                (is (= [[::err-1! {:exception ex
-                                   :reason    "request-fn threw an exception"}]
-                        [::err-2! {:exception ex
-                                   :reason    "request-fn threw an exception"}]]
+                (is (= [[::err-1! #{{:exception ex
+                                     :reason    "request-fn threw an exception"}}]
+                        [::err-2! #{{:exception ex
+                                     :reason    "request-fn threw an exception"}}]]
                        @commands))))))
         (done)))))

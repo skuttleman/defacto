@@ -101,7 +101,9 @@
        (addWatch [this key f] (add-watch* this atom-db key f))
        (removeWatch [_ key] (remove-watch atom-db key))]))
 
-(defn create [ctx-map init-db api ->sub]
+(defn create
+  "Use this to construct a [[DefactoStore]]"
+  [ctx-map init-db api ->sub]
   (let [->Sub #(->StandardSubscription %1 %2 (:query-responder api) false)
         base-store (->WatchableStore ctx-map (atom init-db) api ->Sub)]
-     (->DefactoStore base-store (->query-cached-sub-fn ->sub) api)))
+    (->DefactoStore base-store (->query-cached-sub-fn ->sub) api)))

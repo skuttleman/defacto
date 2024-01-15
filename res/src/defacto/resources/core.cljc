@@ -7,7 +7,18 @@
 (defmulti ^{:arglists '([resource-key params])} ->request-spec
           "Implement this to generate a request spec from a resource-key.
            Your implementation should return a map containing any of the following:
-           - :params     - passed to the request fn"
+
+           - :params       - passed to the request fn
+
+           - :pre-events   - xs of events to emitted before the request is made
+           - :pre-commands - xs of commands to dispatched before the request is made
+           - :ok-events    - xs of events to emitted upon success with the payload conj'ed onto the event
+           - :ok-commands  - xs of commands to dispatched upon success with the payload conj'ed onto the command
+           - :err-events   - xs of events to emitted upon failure with the payload conj'ed onto the event
+           - :err-commands - xs of commands to dispatched upon failure with the payload conj'ed onto the command
+
+           - :->ok         - optionally transform the ok response payload
+           - :->err        - optionally transform the error response payload"
           (fn [resource-key _]
             (first resource-key)))
 
@@ -42,7 +53,8 @@
 
 (defn ^:private ->input [resource-key {:keys [params] :as spec}]
   (-> (->request-spec resource-key params)
-      (assoc :resource-type (first resource-key))
+      (assoc :resource-type (first resource-key)
+             :spec spec)
       (with-msgs :pre-events spec)
       (with-msgs :pre-commands spec)
       (with-msgs :ok-events spec)

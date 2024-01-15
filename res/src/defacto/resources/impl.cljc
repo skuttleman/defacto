@@ -23,13 +23,14 @@
     [:err {:result result
            :reason "request-fn must return a vector"}]))
 
-(defn ^:private send-all [send-fn messages result]
+(defn ^:private send-all [send-fn messages result ->output]
   (run! send-fn (for [msg messages]
-                  (conj msg result))))
+                  (conj msg (->output result)))))
 
 (defn request!
   [{::defacto/keys [store] ::keys [request-fn]} input emit-cb]
   (let [{:keys [params pre-events pre-commands resource-type]} input
+        {:keys [->err ->ok] :or {->err identity ->ok identity}} input
         dispatch-cb (partial defacto/dispatch! store)]
     (run! emit-cb pre-events)
     (run! dispatch-cb pre-commands)
@@ -38,9 +39,9 @@
             ch (->ch (safely! request-fn resource-type params))]
         (async/go
           (let [[status payload] (->result (async/<! ch))
-                [events commands] (if (= :defacto.resources.core/ok status)
-                                    [ok-events ok-commands]
-                                    [err-events err-commands])]
-            (send-all emit-cb events payload)
-            (send-all dispatch-cb commands payload)))))
+                [events commands ->output] (if (= :defacto.resources.core/ok status)
+                                             [ok-events ok-commands ->ok]
+                                             [err-events err-commands ->err])]
+            (send-all emit-cb events payload ->output)
+            (send-all dispatch-cb commands payload ->output)))))
     nil))
