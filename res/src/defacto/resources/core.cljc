@@ -103,6 +103,10 @@
 
 
 ;; queries
+(defmethod defacto/query-responder ::?:resources
+  [db _]
+  (vals (::-resources db)))
+
 (defmethod defacto/query-responder ::?:resource
   [db [_ resource-key]]
   (or (get-in db [::-resources resource-key])

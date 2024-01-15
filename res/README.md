@@ -132,6 +132,15 @@ Executes a command after `milliseconds` have expired.
 
 This module exposes the following `queries`.
 
+### [::res/?:resources]
+
+Returns a sequence of all resources.
+
+```clojure
+@(defacto/subscribe store [::res/?:resources])
+;; returns `nil` for undefined resources
+```
+
 ### [::res/?:resource resource-key]
 
 Retrieves the current state of a resource.
