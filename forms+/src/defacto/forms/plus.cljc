@@ -19,6 +19,9 @@
           (fn [resource-key _form-data]
             (first resource-key)))
 
+(defn ->form+ [form res]
+  (merge form res))
+
 
 ;; forms
 (defmethod res/->request-spec ::std
