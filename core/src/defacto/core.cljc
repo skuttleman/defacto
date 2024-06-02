@@ -69,9 +69,12 @@
   ([ctx-map init-db]
    (create ctx-map init-db nil))
   ([ctx-map init-db {:keys [->sub] :or {->sub atom} :as opts}]
-   (let [api {:command-handler (:command-handler opts command-handler)
-              :event-reducer   (:event-reducer opts event-reducer)
-              :query-responder (:query-responder opts query-responder)}
+   (let [handler-mw (:handler-mw opts identity)
+         reducer-mw (:reducer-mw opts identity)
+         responder-mw (:responder-mw opts identity)
+         api {:command-handler (handler-mw command-handler)
+              :event-reducer   (reducer-mw event-reducer)
+              :query-responder (responder-mw query-responder)}
          store (impl/create ctx-map init-db api ->sub)]
      (walk/postwalk (fn [x]
                       (when (satisfies? IInitialize x)
