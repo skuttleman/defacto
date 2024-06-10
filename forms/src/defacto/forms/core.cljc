@@ -96,6 +96,10 @@
 
 
 ;; queries
+(defmethod defacto/query-responder ::?:forms
+  [db _]
+  (vals (::-forms db)))
+
 (defmethod defacto/query-responder ::?:form
   [db [_ form-id]]
   (get-in db [::-forms form-id]))
