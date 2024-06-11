@@ -101,6 +101,13 @@
       (emit-cb [::submitted resource-key params])
       (impl/request! ctx-map (->input resource-key spec) emit-cb))))
 
+(defmethod defacto/command-handler ::swap!
+  [{::defacto/keys [store]} [_ resource-key data] emit-cb]
+  (async/go
+    (let [params (params (get-in @store [::-resources resource-key]))]
+      (emit-cb [::submitted resource-key params])
+      (async/<! (async/timeout 1))
+      (emit-cb [::succeeded resource-key data]))))
 
 ;; queries
 (defmethod defacto/query-responder ::?:resources
