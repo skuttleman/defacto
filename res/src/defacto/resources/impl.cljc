@@ -8,8 +8,8 @@
   (try
     (apply request-fn args)
     (catch #?(:cljs :default :default Throwable) ex
-      [:err {:exception ex
-             :reason    "request-fn threw an exception"}])))
+      [:defacto.resources.core/err {:exception ex
+                                    :reason    "request-fn threw an exception"}])))
 
 (defn ^:private ->ch [ch-or-result]
   (async/go
@@ -20,8 +20,8 @@
 (defn ^:private ->result [result]
   (if (vector? result)
     result
-    [:err {:result result
-           :reason "request-fn must return a vector"}]))
+    [:defacto.resources.core/err {:result result
+                                  :reason "request-fn must return a vector"}]))
 
 (defn ^:private send-all [send-fn messages result ->output]
   (run! send-fn (for [msg messages]
