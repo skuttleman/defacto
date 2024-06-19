@@ -95,20 +95,6 @@ This submits a resource if it is currently in the `:init` state.
 (defacto/dispatch! store [::res/ensure! [::resource-type] {:a 1}])
 ```
 
-### [::res/sync! resource-key params]
-
-This submits a resource if it is in the `:init` state (i.e. un-submitted) or the request `params` are different
-from the previous submission's `params`.
-
-```clojure
-(defacto/dispatch! store [::res/sync! [::resource-type] {:a 1}])
-;; submits resource
-(defacto/dispatch! store [::res/sync! [::resource-type] {:a 1}])
-;; does not submit resource
-(defacto/dispatch! store [::res/sync! [::resource-type] {:a 2}])
-;; submits resource
-```
-
 ### [::res/poll! milliseconds resource-key params]
 
 Continuously submits a resource in intervals of `milliseconds`.

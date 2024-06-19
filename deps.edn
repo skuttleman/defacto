@@ -1,2 +1,7 @@
 {:deps    {skuttleman/defacto-core {:local/root "core"}}
- :aliases {:dev {org.clojure/clojurescript {:mvn/version "1.10.844"}}}}
+ :aliases {:dev {:extra-paths ["core/src" "core/test"
+                               "forms+/src" "forms+/test"
+                               "forms/test" "forms/test"
+                               "res/src" "res/test"]
+                 :extra-deps  {org.clojure/clojurescript {:mvn/version "1.10.844"}
+                               skuttleman/defacto-forms+ {:local/root "forms+"}}}}}

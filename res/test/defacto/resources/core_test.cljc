@@ -57,27 +57,6 @@
             (testing "submits the resource"
               (is (= @calls [[::request-fn {:some :params}]])))))
 
-        (testing "when syncing a resource"
-          (testing "and when the resource has not been requested"
-            (reset! calls [])
-            (defacto/emit! store [::res/destroyed [::resource 123]])
-            (defacto/dispatch! store [::res/sync! [::resource 123] {:some :params}])
-
-            (testing "submits the resource"
-              (is (= @calls [[::request-fn {:some :params}]]))))
-
-          (testing "and when the resource is being re-requested with the same params"
-            (reset! calls [])
-            (defacto/dispatch! store [::res/sync! [::resource 123] {:some :params}])
-            (testing "does not submit the resource"
-              (is (empty? @calls))))
-
-          (testing "and when the resource is being re-requested with different params"
-            (reset! calls [])
-            (defacto/dispatch! store [::res/sync! [::resource 123] {:different :params}])
-            (testing "submits the resource"
-              (is (= @calls [[::request-fn {:different :params}]])))))
-
         (testing "when polling a resource"
           (reset! calls [])
           (defacto/dispatch! store [::res/poll! 50 [::resource 123] {:some :params}])
