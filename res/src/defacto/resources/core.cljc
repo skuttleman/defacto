@@ -89,7 +89,7 @@
         expired? (when (and ms ttl)
                    (> (- (now-ms) ms) ttl))]
     (when (or expired? (init? res))
-      (defacto/dispatch! store [::submit! resource-key params]))))
+      (defacto/dispatch! store [::submit! resource-key (dissoc params ::ttl)]))))
 
 (defmethod defacto/command-handler ::poll!
   [{::defacto/keys [store] :as ctx-map} [_ ms resource-key params when-exists?] emit-cb]

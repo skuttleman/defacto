@@ -36,7 +36,15 @@
             (reset! calls [])
             (defacto/dispatch! store [::res/ensure! [::resource 123] {:some :params}])
             (testing "does not submit the resource"
-              (is (empty? @calls)))))
+              (is (empty? @calls))))
+
+          (testing "and when ensuring the resource was not requested recently"
+            (async/<! (async/timeout 500))
+            (testing "and when ensuring the resource exists with a ttl"
+              (reset! calls [])
+              (defacto/dispatch! store [::res/ensure! [::resource 123] {::res/ttl 500 :some :params}])
+              (testing "submits the resource"
+                (is (contains? (set @calls) [::request-fn {:some :params}]))))))
 
         (testing "when submitting an existing resource"
           (reset! calls [])
