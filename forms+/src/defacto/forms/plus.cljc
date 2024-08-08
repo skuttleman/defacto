@@ -1,5 +1,6 @@
 (ns defacto.forms.plus
   "An extension module that combines [[defacto.forms.core]] with [[defacto.resources.core]]"
+  #?(:cljs (:require-macros defacto.forms.plus))
   (:require
     [defacto.core :as defacto]
     [defacto.forms.core :as forms]
@@ -18,6 +19,11 @@
            be distinguished from other errors: `{::forms/data validate-return-val}`."
           (fn [resource-key _form-data]
             (first resource-key)))
+
+(defmacro validated [dispatch-key validator argv & body]
+  `(let [validator# ~validator]
+     (defmethod res/->request-spec ~dispatch-key [_# data#] (validator# data#))
+     (defmethod validate ~dispatch-key ~argv ~@body)))
 
 (defn ->form+ [form res]
   (merge form res))
