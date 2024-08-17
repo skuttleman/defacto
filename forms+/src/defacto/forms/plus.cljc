@@ -22,8 +22,8 @@
 
 (defmacro validated [dispatch-key validator argv & body]
   `(let [validator# ~validator]
-     (defmethod res/->request-spec ~dispatch-key [_# data#] (validator# data#))
-     (defmethod validate ~dispatch-key ~argv ~@body)))
+     (defmethod validate ~dispatch-key [_# data#] (validator# data#))
+     (defmethod res/->request-spec ~dispatch-key ~argv ~@body)))
 
 (defn ->form+ [form res]
   (merge form res))
