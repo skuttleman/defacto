@@ -82,6 +82,10 @@ Creates a new form, clobbering an existing form with the same id if it exists.
 
 Changes the value at a path into your data model.
 
+### [::forms/modified form-id path f arg1 arg2 ...]
+
+Modifies the value at a path in your data model by applying a function and additional args.
+
 ```clojure
 (defacto/emit! store [::forms/changed ::unique-form-id [:some :path] "value"])
 ```

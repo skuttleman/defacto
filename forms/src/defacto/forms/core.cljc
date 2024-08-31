@@ -67,6 +67,21 @@
       (update form ::current dissoc path)
       (assoc-in form [::current path] value))))
 
+(defn modify
+  "Modifies the value of a form at a path by applying a function
+   and any additional args.
+
+  (-> form
+      (modify [:some 0 :path] (fnil + 0) 7 12)
+      data)
+  ;; => {:some [{:path 19}]}"
+  [form path f & args]
+  (when form
+    (let [value (apply f (get-in form [::current path]) args)]
+      (if (and (nil? value) (:remove-nil? (opts form)))
+        (update form ::current dissoc path)
+        (assoc-in form [::current path] value)))))
+
 (defn changed?
   "Does the current value of the form differ from the initial value?"
   ([{::keys [current init]}]
@@ -113,6 +128,10 @@
 (defmethod defacto/event-reducer ::changed
   [db [_ form-id path value]]
   (update-in db [::-forms form-id] change path value))
+
+(defmethod defacto/event-reducer ::modified
+  [db [_ form-id path f & args]]
+  (apply update-in db [::-forms form-id] modify path f args))
 
 (defmethod defacto/event-reducer ::destroyed
   [db [_ form-id]]
