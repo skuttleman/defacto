@@ -72,15 +72,18 @@
    and any additional args.
 
   (-> form
-      (modify [:some 0 :path] (fnil + 0) 7 12)
+      (modify [:some] (fnil conj []) {:path 1})
+      (modify [:some 0 :path] + [7 12])
       data)
-  ;; => {:some [{:path 19}]}"
-  [form path f & args]
-  (when form
-    (let [value (apply f (get-in form [::current path]) args)]
-      (if (and (nil? value) (:remove-nil? (opts form)))
-        (update form ::current dissoc path)
-        (assoc-in form [::current path] value)))))
+  ;; => {:some [{:path 20}]}"
+  ([form path f]
+   (modify form path f nil))
+  ([form path f args]
+   (when form
+     (let [model (apply update-in (data form) path f args)]
+       (if (and (nil? (get-in model path)) (:remove-nil? (opts form)))
+         (update form ::current dissoc path)
+         (assoc form ::current (flatten model)))))))
 
 (defn changed?
   "Does the current value of the form differ from the initial value?"
@@ -131,7 +134,7 @@
 
 (defmethod defacto/event-reducer ::modified
   [db [_ form-id path f & args]]
-  (apply update-in db [::-forms form-id] modify path f args))
+  (update-in db [::-forms form-id] modify path f args))
 
 (defmethod defacto/event-reducer ::destroyed
   [db [_ form-id]]
