@@ -54,19 +54,6 @@
   (when form
     (nest (::init form))))
 
-(defn change
-  "Changes a value of a form at a path.
-
-  (-> form
-      (change [:some 0 :path] 42)
-      data)
-  ;; => {:some [{:path 42}]}"
-  [form path value]
-  (when form
-    (if (and (nil? value) (:remove-nil? (opts form)))
-      (update form ::current dissoc path)
-      (assoc-in form [::current path] value))))
-
 (defn modify
   "Modifies the value of a form at a path by applying a function
    and any additional args.
@@ -80,10 +67,27 @@
    (modify form path f nil))
   ([form path f args]
    (when form
-     (let [model (apply update-in (data form) path f args)]
-       (if (and (nil? (get-in model path)) (:remove-nil? (opts form)))
-         (update form ::current dissoc path)
-         (assoc form ::current (flatten model)))))))
+     (let [{:keys [remove-nil? update-fn] :or {update-fn identity}} (opts form)
+           model (apply update-in (data form) path f args)
+           remove? (and (nil? (get-in model path)) remove-nil?)
+           long-path? (next path)
+           model (cond-> model
+                   (and remove? long-path?)
+                   (update-in (butlast path) dissoc (last path))
+
+                   (and remove? (not long-path?))
+                   (dissoc (first path)))]
+       (assoc form ::current (flatten (update-fn model)))))))
+
+(defn change
+  "Changes a value of a form at a path.
+
+  (-> form
+      (change [:some 0 :path] 42)
+      data)
+  ;; => {:some [{:path 42}]}"
+  [form path value]
+  (modify form path (constantly value)))
 
 (defn changed?
   "Does the current value of the form differ from the initial value?"

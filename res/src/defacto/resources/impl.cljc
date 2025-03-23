@@ -27,6 +27,22 @@
   (run! send-fn (for [msg messages]
                   (conj msg (->output result)))))
 
+(defn ^:private ->upload-progress-ch [{:keys [prog-events prog-commands]} emit-cb dispatch-cb]
+  (when (or (seq prog-events) (seq prog-commands))
+    (let [chan (async/chan)]
+      (async/go-loop []
+        (let [report (async/<! chan)]
+          (if (= :upload (:direction report))
+            (do
+              (send-all emit-cb prog-events report identity)
+              (send-all dispatch-cb prog-commands report identity)
+              (recur))
+            (do
+              (send-all emit-cb prog-events {:status :complete} identity)
+              (send-all dispatch-cb prog-commands {:status :complete} identity)
+              (async/close! chan)))))
+      chan)))
+
 (defn request!
   [{::defacto/keys [store] ::keys [request-fn]} input emit-cb]
   (let [{:keys [params pre-events pre-commands resource-type]} input
@@ -36,7 +52,8 @@
     (run! dispatch-cb pre-commands)
     (when (some? params)
       (let [{:keys [ok-events ok-commands err-events err-commands]} input
-            ch (->ch (safely! request-fn resource-type params))]
+            progress (->upload-progress-ch input emit-cb dispatch-cb)
+            ch (->ch (safely! request-fn resource-type (assoc params :progress progress)))]
         (async/go
           (let [[status payload] (->result (async/<! ch))
                 [events commands ->output] (if (= :defacto.resources.core/ok status)
