@@ -70,6 +70,10 @@
 (defn ^:private now-ms []
   #?(:clj (.getTime (Date.)) :cljs (.getTime (js/Date.))))
 
+(defn ^:private request! [ctx-map resource-key spec emit-cb]
+  (emit-cb [::submitted resource-key])
+  (impl/request! ctx-map (->input resource-key spec) emit-cb))
+
 ;; commands
 (defmethod defacto/command-handler ::delay!
   [{::defacto/keys [store]} [_ ms command] _]
@@ -80,8 +84,7 @@
 (defmethod defacto/command-handler ::submit!
   [ctx-map [_ resource-key params] emit-cb]
   (let [spec (params->spec resource-key params)]
-    (emit-cb [::submitted resource-key])
-    (impl/request! ctx-map (->input resource-key spec) emit-cb)))
+    (request! ctx-map resource-key spec emit-cb)))
 
 (defmethod defacto/command-handler ::ensure!
   [{::defacto/keys [store]} [_ resource-key {::keys [ttl] :as params}] _]
@@ -97,8 +100,7 @@
     (let [spec (-> (params->spec resource-key params)
                    (assoc :ok-commands [[::delay! ms [::poll! ms resource-key params true]]]
                           :err-commands [[::delay! ms [::poll! ms resource-key params true]]]))]
-      (emit-cb [::submitted resource-key])
-      (impl/request! ctx-map (->input resource-key spec) emit-cb))))
+      (request! ctx-map resource-key spec emit-cb))))
 
 
 ;; queries
