@@ -1,0 +1,4 @@
+{:linters {:unused-binding          {:level :off}
+           :unused-private-function {:level :off}
+           :unused-private-var      {:level :off}}
+ :lint-as {defacto.forms.plus/validated clojure.core/defmethod}}
