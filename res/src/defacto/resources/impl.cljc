@@ -24,7 +24,7 @@
                                   :reason "request-fn must return a vector"}]))
 
 (defn ^:private send-all [send-fn messages result ->output]
-  (run! send-fn (for [msg messages]
+  (run! send-fn (for [msg (distinct messages)]
                   (conj msg (->output result)))))
 
 (defn ^:private ->upload-progress-ch [{:keys [prog-events prog-commands]} emit-cb dispatch-cb]

@@ -70,9 +70,12 @@
 (defn ^:private now-ms []
   #?(:clj (.getTime (Date.)) :cljs (.getTime (js/Date.))))
 
-(defn ^:private request! [ctx-map resource-key spec emit-cb]
-  (emit-cb [::submitted resource-key])
-  (impl/request! ctx-map (->input resource-key spec) emit-cb))
+(defn ^:private request!
+  ([ctx-map resource-key spec emit-cb]
+   (request! ctx-map resource-key spec ::submitted emit-cb))
+  ([ctx-map resource-key spec event-key emit-cb]
+   (emit-cb [event-key resource-key])
+   (impl/request! ctx-map (->input resource-key spec) emit-cb)))
 
 ;; commands
 (defmethod defacto/command-handler ::delay!
@@ -102,6 +105,12 @@
                           :err-commands [[::delay! ms [::poll! ms resource-key params true]]]))]
       (request! ctx-map resource-key spec emit-cb))))
 
+(defmethod defacto/command-handler ::resubmit!
+  [ctx-map [_ resource-key params] emit-cb]
+  (let [spec {:params     params
+              :ok-events  [[::succeeded resource-key]]
+              :err-events [[::reverted resource-key]]}]
+    (request! ctx-map resource-key spec ::resubmitted emit-cb)))
 
 ;; queries
 (defmethod defacto/query-responder ::?:resources
@@ -122,13 +131,39 @@
              ::status :requesting
              ::ms (now-ms)))
 
+(defmethod defacto/event-reducer ::resubmitted
+  [db [_ resource-key]]
+  (cond-> db
+    (get-in db [::-resources resource-key])
+    (update-in [::-resources resource-key]
+               (fn [res]
+                 (-> res
+                     (assoc ::prev-status (::status res)
+                            ::status :requesting
+                            ::ms (now-ms)))))))
+
 (defmethod defacto/event-reducer ::succeeded
   [db [_ resource-key data]]
   (cond-> db
     (requesting? (get-in db [::-resources resource-key]))
-    (update-in [::-resources resource-key] assoc
-               ::status :success
-               ::payload data)))
+    (update-in [::-resources resource-key]
+               (fn [res]
+                 (-> res
+                     (assoc ::status :success
+                            ::payload data)
+                     (dissoc ::prev-status))))))
+
+(defmethod defacto/event-reducer ::reverted
+  [db [_ resource-key]]
+  (let [res (get-in db [::-resources resource-key])]
+    (cond-> db
+      (and (requesting? res)
+           (::prev-status res))
+      (update-in [::-resources resource-key]
+                 (fn [res]
+                   (-> res
+                       (assoc ::status (::prev-status res))
+                       (dissoc ::prev-status)))))))
 
 (defmethod defacto/event-reducer ::failed
   [db [_ resource-key errors]]
