@@ -30,7 +30,7 @@
           (testing "and when the resource does not exist"
             (defacto/dispatch! store [::res/ensure! [::resource 123] {:some :params}])
             (testing "submits the resource"
-              (is (contains? (set @calls) [::request-fn {:some :params}]))))
+              (is (contains? (set @calls) [::request-fn {:some :params :progress nil}]))))
 
           (testing "and when the resource exists"
             (reset! calls [])
@@ -44,13 +44,13 @@
               (reset! calls [])
               (defacto/dispatch! store [::res/ensure! [::resource 123] {::res/ttl 500 :some :params}])
               (testing "submits the resource"
-                (is (contains? (set @calls) [::request-fn {:some :params}]))))))
+                (is (contains? (set @calls) [::request-fn {:some :params :progress nil}]))))))
 
         (testing "when submitting an existing resource"
           (reset! calls [])
           (defacto/dispatch! store [::res/submit! [::resource 123] {:some :params}])
           (testing "submits the resource"
-            (is (= @calls [[::request-fn {:some :params}]]))))
+            (is (= @calls [[::request-fn {:some :params :progress nil}]]))))
 
         (testing "when delaying a resource"
           (reset! calls [])
@@ -63,19 +63,19 @@
           (testing "and when the delay has expired"
             (async/<! (async/timeout 51))
             (testing "submits the resource"
-              (is (= @calls [[::request-fn {:some :params}]])))))
+              (is (= @calls [[::request-fn {:some :params :progress nil}]])))))
 
         (testing "when polling a resource"
           (reset! calls [])
           (defacto/dispatch! store [::res/poll! 50 [::resource 123] {:some :params}])
           (testing "submits the resource"
-            (is (= @calls [[::request-fn {:some :params}]])))
+            (is (= @calls [[::request-fn {:some :params :progress nil}]])))
 
           (testing "and when the poll period has elapsed"
             (reset! calls [])
             (async/<! (async/timeout 51))
             (testing "re-submits the resource"
-              (is (= @calls [[::request-fn {:some :params}]]))))
+              (is (= @calls [[::request-fn {:some :params :progress nil}]]))))
 
           (testing "and when the resource is destroyed"
             (defacto/emit! store [::res/destroyed [::resource 123]])

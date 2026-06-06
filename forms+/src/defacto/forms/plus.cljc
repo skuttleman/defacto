@@ -6,10 +6,10 @@
     [defacto.forms.core :as forms]
     [defacto.resources.core :as res]))
 
-(defmulti ^{:arglists '([resource-key form resource-payload])} re-init
+(defmulti ^{:arglists '([form-key form resource-payload])} re-init
           "Extend this multimethod to define how your form is reinitialized upon
            successful submission. Defaults to the initial form value."
-          (fn [resource-key _ _]
+          (fn [[_ resource-key] _ _]
             (first resource-key)))
 
 (defmulti ^{:arglists '([resource-key form-data])} validate
@@ -50,11 +50,18 @@
 
 
 ;; commands
-(defmethod defacto/command-handler ::submit!
-  [{::defacto/keys [store]} [_ form-key params] _]
+(defn ^:private submit-form! [action store form-key params]
   (let [form (defacto/query-responder @store [::forms/?:form form-key])
         params (cond-> params form (assoc ::forms/form form))]
-    (defacto/dispatch! store [::res/submit! form-key params])))
+    (defacto/dispatch! store [action form-key params])))
+
+(defmethod defacto/command-handler ::submit!
+  [{::defacto/keys [store]} [_ form-key params] _]
+  (submit-form! ::res/submit! store form-key params))
+
+(defmethod defacto/command-handler ::resubmit!
+  [{::defacto/keys [store]} [_ form-key params] _]
+  (submit-form! ::res/resubmit! store form-key params))
 
 
 ;; queries
@@ -66,9 +73,9 @@
 
 ;; events
 (defmethod defacto/event-reducer ::recreated
-  [db [_ [_ resource-key :as form-key] result]]
+  [db [_ form-key result]]
   (let [form (defacto/query-responder db [::?:form+ form-key])
-        next-init (re-init resource-key form result)]
+        next-init (re-init form-key form result)]
     (defacto/event-reducer db [::forms/created form-key next-init (forms/opts form)])))
 
 (defmethod defacto/event-reducer ::destroyed
