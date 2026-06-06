@@ -58,6 +58,14 @@ Creates a form if there isn't already one with the supplied `form-id`.
 
 This module exposes the following `queries`.
 
+### [::forms/?:forms]
+
+Returns a sequence of all forms.
+
+```clojure
+@(defacto/subscribe store [::forms/?:forms])
+```
+
 ### [::forms/?:form form-id]
 
 Queries the current form.
@@ -70,7 +78,7 @@ Queries the current form.
 
 This module exposes the following `events`.
 
-### [::forms/created form-id data >opts]
+### [::forms/created form-id data ?opts]
 
 Creates a new form, clobbering an existing form with the same id if it exists.
 
@@ -87,7 +95,9 @@ Changes the value at a path into your data model.
 Modifies the value at a path in your data model by applying a function and additional args.
 
 ```clojure
-(defacto/emit! store [::forms/changed ::unique-form-id [:some :path] "value"])
+(defacto/emit! store [::forms/modified ::unique-form-id [:count] inc])
+;; or with args
+(defacto/emit! store [::forms/modified ::unique-form-id [:count] + 5])
 ```
 
 ### [::forms/destroyed form-id]

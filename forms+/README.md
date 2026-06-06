@@ -30,13 +30,13 @@ A module for combing the functionality of [defacto-forms](../forms/README.md) wi
 
 (defn input [form+ path]
   [:input {:value     (get-in (forms/data form+) path)
-           :on-change (fn [_]
+           :on-change (fn [e]
                         (defacto/emit! store [::forms/changed [::forms+/std [::my-res-spec 123]]
                                               path
                                               (-> e .-target .-value)]))}])
 
 (defn app []
-  (r/with-let [sub (store/subscribe [::forms+/:form+ [::forms+/std [::my-res-spec 123]]])]
+  (r/with-let [sub (defacto/subscribe store [::forms+/?:form+ [::forms+/std [::my-res-spec 123]]])]
     (let [form+ @sub] ;; a `form+` is a `form` AND a `resource`
       (if (res/requesting? form+)
         [:div "loading..."]
@@ -48,7 +48,7 @@ A module for combing the functionality of [defacto-forms](../forms/README.md) wi
                                                          {:additional :input}]))}
           "Submit!"]]))
     (finally
-      (defacto/emit! store [::forms+/destroyed]))))
+      (defacto/emit! store [::forms+/destroyed [::forms+/std [::my-res-spec 123]]])))
 
 
 ;; a `form+` is wrapper around a normal defacto resource spec
@@ -82,12 +82,12 @@ the form. In order to use this form, you must extend `forms+/validate`.
 
 
 ;; now change the form-key in the above example to use `::forms+/valid` instead of `::forms+/std`
-(defacto/subscribe [::forms+/:form+ [::forms+/valid [::my-res-spec 123]]])
+(defacto/subscribe store [::forms+/?:form+ [::forms+/valid [::my-res-spec 123]]])
 
 
 ;; if the form is invalid, the resource will not be submitted, and instead will fail with:
 ;; {::forms/errors return-val-from-validate} to distinguish
-(res/payload @(defacto/subscribe [::forms+/:form+ [::forms+/valid [::my-res-spec 123]]]))
+(res/payload @(defacto/subscribe store [::forms+/?:form+ [::forms+/valid [::my-res-spec 123]]]))
 ;; {::forms/errors {:key ["something is wrong"]}}
 ```
 
@@ -110,7 +110,7 @@ This module exposes the following `queries`.
 ### [::forms+/?:form+ form-key]
 
 ```clojure
-@(defacto/subscribe store [::forms+/?form+ [::forms+/valid [::my-res-spec 123]]])
+@(defacto/subscribe store [::forms+/?:form+ [::forms+/valid [::my-res-spec 123]]])
 ```
 
 ## Events
