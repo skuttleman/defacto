@@ -84,6 +84,10 @@
     (async/<! (async/timeout ms))
     (defacto/dispatch! store command)))
 
+(defmethod defacto/command-handler ::do!
+  [ctx-map [_ resource-key params] emit-cb]
+  (impl/request! ctx-map (->input resource-key {:params params}) emit-cb))
+
 (defmethod defacto/command-handler ::submit!
   [ctx-map [_ resource-key params] emit-cb]
   (let [spec (params->spec resource-key params)]
