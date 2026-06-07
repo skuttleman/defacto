@@ -34,7 +34,7 @@
   [[_ resource-key :as form-key] {::forms/keys [form] :as params}]
   (let [form-data (forms/data form)]
     (-> (res/->request-spec resource-key (assoc params ::forms/data form-data))
-        (update :pre-events conj [::res/resubmitted resource-key])
+        (update :pre-events conj [::res/submitted resource-key])
         (update :ok-events conj [::recreated form-key] [::res/succeeded resource-key])
         (update :err-events conj [::res/reverted resource-key]))))
 
@@ -44,7 +44,7 @@
     (if-let [errors (validate resource-key form-data)]
       {:pre-events [[::res/failed form-key {::forms/errors errors}]]}
       (-> (res/->request-spec resource-key (assoc params ::forms/data form-data))
-          (update :pre-events conj [::res/resubmitted resource-key])
+          (update :pre-events conj [::res/submitted resource-key])
           (update :ok-events conj [::recreated form-key] [::res/succeeded resource-key])
           (update :err-events conj [::res/reverted resource-key])))))
 

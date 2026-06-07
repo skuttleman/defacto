@@ -164,10 +164,6 @@ This module exposes the following `events`.
 
 Transitions the resource from any state to `:requesting`. **Not intended to be used directly**
 
-### [::res/resubmitted resource-key]
-
-Transitions the resource to `:requesting` while saving the current state for potential reversion. **Not intended to be used directly**
-
 ### [::res/succeeded resource-key data]
 
 Transitions the resource from a `:requesting` state to a `:success` state. **Not intended to be used directly**

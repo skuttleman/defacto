@@ -71,11 +71,9 @@
   #?(:clj (.getTime (Date.)) :cljs (.getTime (js/Date.))))
 
 (defn ^:private request!
-  ([ctx-map resource-key spec emit-cb]
-   (request! ctx-map resource-key spec ::submitted emit-cb))
-  ([ctx-map resource-key spec event-key emit-cb]
-   (emit-cb [event-key resource-key])
-   (impl/request! ctx-map (->input resource-key spec) emit-cb)))
+  [ctx-map resource-key spec emit-cb]
+  (emit-cb [::submitted resource-key])
+  (impl/request! ctx-map (->input resource-key spec) emit-cb))
 
 ;; commands
 (defmethod defacto/command-handler ::delay!
@@ -91,6 +89,13 @@
 (defmethod defacto/command-handler ::submit!
   [ctx-map [_ resource-key params] emit-cb]
   (let [spec (params->spec resource-key params)]
+    (request! ctx-map resource-key spec emit-cb)))
+
+(defmethod defacto/command-handler ::resubmit!
+  [ctx-map [_ resource-key params] emit-cb]
+  (let [spec {:params     params
+              :ok-events  [[::succeeded resource-key]]
+              :err-events [[::reverted resource-key]]}]
     (request! ctx-map resource-key spec emit-cb)))
 
 (defmethod defacto/command-handler ::ensure!
@@ -109,13 +114,6 @@
                           :err-commands [[::delay! ms [::poll! ms resource-key params true]]]))]
       (request! ctx-map resource-key spec emit-cb))))
 
-(defmethod defacto/command-handler ::resubmit!
-  [ctx-map [_ resource-key params] emit-cb]
-  (let [spec {:params     params
-              :ok-events  [[::succeeded resource-key]]
-              :err-events [[::reverted resource-key]]}]
-    (request! ctx-map resource-key spec ::resubmitted emit-cb)))
-
 ;; queries
 (defmethod defacto/query-responder ::?:resources
   [db _]
@@ -131,20 +129,13 @@
 ;; events
 (defmethod defacto/event-reducer ::submitted
   [db [_ resource-key]]
-  (update-in db [::-resources resource-key] assoc
-             ::status :requesting
-             ::ms (now-ms)))
-
-(defmethod defacto/event-reducer ::resubmitted
-  [db [_ resource-key]]
-  (cond-> db
-    (get-in db [::-resources resource-key])
-    (update-in [::-resources resource-key]
-               (fn [res]
-                 (-> res
-                     (assoc ::prev-status (::status res)
-                            ::status :requesting
-                            ::ms (now-ms)))))))
+  (update-in db
+             [::-resources resource-key]
+             (fn [res]
+               (-> res
+                   (assoc ::prev-status (::status res :init)
+                          ::status :requesting
+                          ::ms (now-ms))))))
 
 (defmethod defacto/event-reducer ::succeeded
   [db [_ resource-key data]]
