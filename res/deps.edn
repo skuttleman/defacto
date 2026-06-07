@@ -1,5 +1,5 @@
 {:paths   ["src"]
- :deps    {org.clojure/core.async {:mvn/version "1.6.673"}
+ :deps    {org.clojure/core.async {:mvn/version "1.9.865"}
            skuttleman/defacto     {:local/root "../core"}}
  :aliases {:dev {:extra-paths ["test"]
-                 :extra-deps  {org.clojure/clojurescript {:mvn/version "1.10.844"}}}}}
+                 :extra-deps  {org.clojure/clojurescript {:mvn/version "1.12.145"}}}}}
