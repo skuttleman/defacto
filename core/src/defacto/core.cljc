@@ -27,7 +27,7 @@
            ```"
           (fn [_ [type]] type))
 
-(defmulti ^{:arglists '([db query-responder])} query-responder
+(defmulti ^{:arglists '([db query])} query-responder
           "Processes a query and returns the data from the db. Your [[query-responder]]
            implementation should have NO SIDE EFFECTS. Those belong in [[command-handler]]s.
 

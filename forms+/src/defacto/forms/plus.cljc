@@ -57,10 +57,6 @@
 
 (defmethod defacto/command-handler ::submit!
   [{::defacto/keys [store]} [_ form-key params] _]
-  (submit-form! ::res/submit! store form-key params))
-
-(defmethod defacto/command-handler ::resubmit!
-  [{::defacto/keys [store]} [_ form-key params] _]
   (submit-form! ::res/resubmit! store form-key params))
 
 
