@@ -3,5 +3,6 @@
                                "forms+/src" "forms+/test"
                                "forms/test" "forms/test"
                                "res/src" "res/test"]
-                 :extra-deps  {org.clojure/clojurescript {:mvn/version "1.10.844"}
-                               skuttleman/defacto-forms+ {:local/root "forms+"}}}}}
+                 :extra-deps  {org.clojure/clojurescript {:mvn/version "1.12.145"}
+                               skuttleman/defacto-forms+ {:local/root "forms+"}
+                               skuttleman/slag-test      {:local/root "../slag/test-utils"}}}}}

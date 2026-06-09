@@ -3,9 +3,9 @@
     [clojure.test :refer [deftest is testing]]
     [clojure.core.async :as async]
     [defacto.core :as defacto]
-    [defacto.test.utils :as tu]
     [defacto.resources.core :as res]
-    [defacto.resources.impl :as impl]))
+    [defacto.resources.impl :as impl]
+    [slag.test.utils.async :as tua]))
 
 (def ^:private fixture
   {:params       {:some :params}
@@ -25,7 +25,7 @@
    :->err        (partial conj #{})})
 
 (deftest request!-test
-  (tu/async done
+  (tua/async done
     (async/go
       (let [commands (atom [])
             events (atom [])

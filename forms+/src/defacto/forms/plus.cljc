@@ -50,14 +50,11 @@
 
 
 ;; commands
-(defn ^:private submit-form! [action store form-key params]
-  (let [form (defacto/query-responder @store [::forms/?:form form-key])
-        params (cond-> params form (assoc ::forms/form form))]
-    (defacto/dispatch! store [action form-key params])))
-
 (defmethod defacto/command-handler ::submit!
   [{::defacto/keys [store]} [_ form-key params] _]
-  (submit-form! ::res/resubmit! store form-key params))
+  (let [form (defacto/query-responder @store [::forms/?:form form-key])
+        params (cond-> params form (assoc ::forms/form form))]
+    (defacto/dispatch! store [::res/submit! form-key params])))
 
 
 ;; queries
