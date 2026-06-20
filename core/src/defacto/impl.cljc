@@ -1,7 +1,7 @@
 (ns defacto.impl
   #?(:clj
      (:import
-      (clojure.lang IDeref IRef))))
+      (clojure.lang IDeref IMeta IRef))))
 
 (defprotocol IStore
   "A store for processing `commands` and `events`. A `command` is used to invoke side
@@ -12,6 +12,10 @@
   (-subscribe [this query]
     "Returns a deref-able and watchable subscription to a `query`.
      The subscription should be updated any time the query results change."))
+
+(defprotocol ICleanup
+  "A item that can be cleaned up when no longer needed"
+  (-cleanup! [this sub]))
 
 (defn ^:private add-watch* [this sub key f]
   (add-watch sub key (fn [key _ old new]
@@ -27,18 +31,12 @@
      (-notify-watches sub old new)
      this))
 
-;; TODO - do we always want to do this? Maybe LRU?
-(defn ^:private ->query-cached-sub-fn [->sub]
-  (let [query->sub (atom {})]
-    (fn [query result]
-      (let [sub (-> query->sub
-                    (swap! update query #(or % (->sub result)))
-                    (get query))]
-        (doto sub (reset! result))))))
-
-(deftype ^:private ImmutableSubscription [sub]
+(deftype ^:private ImmutableSubscription [sub meta]
   IDeref
   (#?(:cljs -deref :default deref) [_] @sub)
+
+  IMeta
+  (#?(:cljs -meta :default meta) [_] meta)
 
   #?@(:cljs
       [IWatchable
@@ -61,13 +59,19 @@
     this)
   (-subscribe [_ query]
     (let [responder (:query-responder api)
-          sub (->atom-sub query (responder @watchable-store query))]
-      (add-watch watchable-store query (fn [_ _ old new]
-                                         (let [prev (responder old query)
-                                               next (responder new query)]
-                                           (when-not (= prev next)
-                                             (reset! sub next)))))
-      (->ImmutableSubscription sub))))
+          key (gensym "watch-key-")
+          sub (->atom-sub (responder @watchable-store query))]
+      (add-watch watchable-store key (fn [_ _ old new]
+                                       (let [prev (responder old query)
+                                             next (responder new query)]
+                                         (when-not (= prev next)
+                                           (reset! sub next)))))
+      (->ImmutableSubscription sub {::key key})))
+
+  ICleanup
+  (-cleanup! [_ sub]
+    (when-let [key (::key (meta sub))]
+      (remove-watch watchable-store key))))
 
 (deftype StandardSubscription [atom-db query responder]
   IDeref
@@ -99,6 +103,9 @@
   (-subscribe [_ query]
     (->Sub atom-db query))
 
+  ICleanup
+  (-cleanup! [_ _])
+
   #?@(:cljs
       [IWatchable
        (-add-watch [this key f] (add-watch* this atom-db key f))
@@ -115,4 +122,4 @@
   [ctx-map init-db api ->sub]
   (let [->Sub #(->StandardSubscription %1 %2 (:query-responder api))
         base-store (->WatchableStore ctx-map (atom init-db) api ->Sub)]
-    (->DefactoStore base-store (->query-cached-sub-fn ->sub) api)))
+    (->DefactoStore base-store ->sub api)))
