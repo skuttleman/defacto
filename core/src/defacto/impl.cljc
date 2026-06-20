@@ -1,22 +1,31 @@
 (ns defacto.impl
   #?(:clj
      (:import
-       (clojure.lang IDeref IRef))))
+      (clojure.lang IDeref IRef))))
 
 (defprotocol IStore
   "A store for processing `commands` and `events`. A `command` is used to invoke side
    effects, which may include emitting `events`."
   (-dispatch! [this command]
-    "Dispatches a `command` through the system causing potential side-effects and/or emmitting `events`
+    "Dispatches a `command` through the system causing potential side effects and/or emitting `events`
      which update the internal db.")
   (-subscribe [this query]
     "Returns a deref-able and watchable subscription to a `query`.
      The subscription should be updated any time the query results change."))
 
-(defn ^:private add-watch* [store sub key f]
+(defn ^:private add-watch* [this sub key f]
   (add-watch sub key (fn [key _ old new]
-                       (f key store old new)))
-  store)
+                       (f key this old new)))
+  this)
+
+(defn ^:private remove-watch* [this sub key]
+  (remove-watch sub key)
+  this)
+
+#?(:cljs
+   (defn ^:private notify-watches* [this sub old new]
+     (-notify-watches sub old new)
+     this))
 
 ;; TODO - do we always want to do this? Maybe LRU?
 (defn ^:private ->query-cached-sub-fn [->sub]
@@ -34,13 +43,13 @@
   #?@(:cljs
       [IWatchable
        (-add-watch [this key f] (add-watch* this sub key f))
-       (-remove-watch [_ key] (remove-watch sub key))
-       (-notify-watches [_ old new] (-notify-watches sub old new))]
+       (-remove-watch [this key] (remove-watch* this sub key))
+       (-notify-watches [this old new] (notify-watches* this sub old new))]
 
       :default
       [IRef
        (addWatch [this key f] (add-watch* this sub key f))
-       (removeWatch [_ key] (remove-watch sub key))]))
+       (removeWatch [this key] (remove-watch* this sub key))]))
 
 (deftype DefactoStore [watchable-store ->atom-sub api]
   IDeref
@@ -60,20 +69,20 @@
                                              (reset! sub next)))))
       (->ImmutableSubscription sub))))
 
-(deftype ^:private StandardSubscription [atom-db query responder watchable?]
+(deftype StandardSubscription [atom-db query responder]
   IDeref
   (#?(:cljs -deref :default deref) [_] (responder @atom-db query))
 
   #?@(:cljs
       [IWatchable
-       (-add-watch [this key f] (cond-> this watchable? (add-watch* atom-db key f)))
-       (-remove-watch [_ key] (remove-watch atom-db key))
-       (-notify-watches [_ old new] (-notify-watches atom-db old new))]
+       (-add-watch [this key f] (add-watch* this atom-db key f))
+       (-remove-watch [this key] (remove-watch* this atom-db key))
+       (-notify-watches [this old new] (notify-watches* this atom-db old new))]
 
       :default
       [IRef
-       (addWatch [this key f] (cond-> this watchable? (add-watch* atom-db key f)))
-       (removeWatch [_ key] (remove-watch atom-db key))]))
+       (addWatch [this key f] (add-watch* this atom-db key f))
+       (removeWatch [this key] (remove-watch* this atom-db key))]))
 
 (deftype WatchableStore [ctx-map atom-db api ->Sub]
   IDeref
@@ -93,17 +102,17 @@
   #?@(:cljs
       [IWatchable
        (-add-watch [this key f] (add-watch* this atom-db key f))
-       (-remove-watch [_ key] (remove-watch atom-db key))
-       (-notify-watches [this _ _] this)]
+       (-remove-watch [this key] (remove-watch* this atom-db key))
+       (-notify-watches [this old new] (notify-watches* this atom-db old new))]
 
       :default
       [IRef
        (addWatch [this key f] (add-watch* this atom-db key f))
-       (removeWatch [_ key] (remove-watch atom-db key))]))
+       (removeWatch [this key] (remove-watch* this atom-db key))]))
 
 (defn create
   "Use this to construct a [[DefactoStore]]"
   [ctx-map init-db api ->sub]
-  (let [->Sub #(->StandardSubscription %1 %2 (:query-responder api) false)
+  (let [->Sub #(->StandardSubscription %1 %2 (:query-responder api))
         base-store (->WatchableStore ctx-map (atom init-db) api ->Sub)]
     (->DefactoStore base-store (->query-cached-sub-fn ->sub) api)))

@@ -82,6 +82,17 @@
     (async/<! (async/timeout ms))
     (defacto/dispatch! store command)))
 
+(defmethod defacto/command-handler ::debounce!
+  [{::defacto/keys [store]} [_ key ms command & args] emit-cb]
+  (let [id (gensym "debouncer")]
+    (emit-cb [::-debounced key id])
+    (async/go
+      (async/<! (async/timeout ms))
+      (when (= id (defacto/query-responder @store [::-?:debounce-id key]))
+        (-> store
+            (defacto/emit! [::-debounced key])
+            (defacto/dispatch! (into command args)))))))
+
 (defmethod defacto/command-handler ::do!
   [ctx-map [_ resource-key params] emit-cb]
   (impl/request! ctx-map (->input resource-key {:params params}) emit-cb))
@@ -177,3 +188,15 @@
   (cond-> db
     (success? (get-in db [::-resources resource-key]))
     (assoc-in [::-resources resource-key ::payload] data)))
+
+
+;; internal
+(defmethod defacto/event-reducer ::-debounced
+  [db [_ key id]]
+  (if id
+    (assoc-in db [::-debounce key] id)
+    (update db ::-debounce dissoc key)))
+
+(defmethod defacto/query-responder ::-?:debounce-id
+  [db [_ key]]
+  (get-in db [::-debounce key]))
