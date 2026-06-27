@@ -46,6 +46,10 @@
 (defn payload [resource]
   (::payload resource))
 
+(defn errors [resource]
+  (when (error? resource)
+    (::errors resource)))
+
 (defn ^:private with-msgs [m k spec]
   (if-let [v (seq (get spec k))]
     (update m k (fnil into []) v)
@@ -177,7 +181,7 @@
     (requesting? (get-in db [::-resources resource-key]))
     (update-in [::-resources resource-key] assoc
                ::status :error
-               ::payload errors)))
+               ::errors errors)))
 
 (defmethod defacto/event-reducer ::destroyed
   [db [_ resource-key]]
