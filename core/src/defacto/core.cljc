@@ -114,17 +114,6 @@
   [store query]
   (impl/-subscribe store query))
 
-(defn cleanup!
-  "Cleans up a subscription when no longer needed. The subscription will no longer recieve
-   updates when the store updates.
-
-   ```clojure
-   (cleanup! sub)
-   ```"
-  [store sub]
-  (impl/-cleanup! store sub)
-  store)
-
 (defmethod command-handler ::emit!
   [_ [_ event :as _command] emit-cb]
   (emit-cb event))

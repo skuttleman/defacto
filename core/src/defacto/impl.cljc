@@ -1,7 +1,12 @@
 (ns defacto.impl
   #?(:clj
      (:import
-      (clojure.lang IDeref IMeta IRef))))
+      (clojure.lang IDeref IMeta IRef)
+      (java.lang.ref Cleaner WeakReference))))
+
+(defonce ^:private cleaner
+         #?(:clj  (Cleaner/create)
+            :cljs (js/FinalizationRegistry. (fn [cb] (cb)))))
 
 (defprotocol IStore
   "A store for processing `commands` and `events`. A `command` is used to invoke side
@@ -12,10 +17,6 @@
   (-subscribe [this query]
     "Returns a deref-able and watchable subscription to a `query`.
      The subscription should be updated any time the query results change."))
-
-(defprotocol ICleanup
-  "A item that can be cleaned up when no longer needed"
-  (-cleanup! [this sub]))
 
 (defn ^:private add-watch* [this sub key f]
   (add-watch sub key (fn [key _ old new]
@@ -30,6 +31,15 @@
    (defn ^:private notify-watches* [this sub old new]
      (-notify-watches sub old new)
      this))
+
+(defn ^:private ->watcher [responder query weak-ref]
+  (fn [key store old new]
+    (let [prev (responder old query)
+          next (responder new query)]
+      (if-let [sub #?(:cljs (.deref weak-ref) :default (.get weak-ref))]
+        (when-not (= prev next)
+          (reset! sub next))
+        (remove-watch store key)))))
 
 (deftype ^:private ImmutableSubscription [sub meta]
   IDeref
@@ -60,18 +70,12 @@
   (-subscribe [_ query]
     (let [responder (:query-responder api)
           key (gensym "watch-key-")
-          sub (->atom-sub (responder @watchable-store query))]
-      (add-watch watchable-store key (fn [_ _ old new]
-                                       (let [prev (responder old query)
-                                             next (responder new query)]
-                                         (when-not (= prev next)
-                                           (reset! sub next)))))
-      (->ImmutableSubscription sub {::key key})))
-
-  ICleanup
-  (-cleanup! [_ sub]
-    (when-let [key (::key (meta sub))]
-      (remove-watch watchable-store key))))
+          on-cleanup (fn [] (remove-watch watchable-store key))
+          sub (->atom-sub (responder @watchable-store query))
+          weak-ref #?(:cljs (js/WeakRef. sub) :default (WeakReference. sub))]
+      (add-watch watchable-store key (->watcher responder query weak-ref))
+      (doto (->ImmutableSubscription sub {::key key})
+        (as-> $ (.register cleaner $ on-cleanup))))))
 
 (deftype StandardSubscription [atom-db query responder]
   IDeref
@@ -102,9 +106,6 @@
                          nil))))
   (-subscribe [_ query]
     (->Sub atom-db query))
-
-  ICleanup
-  (-cleanup! [_ _])
 
   #?@(:cljs
       [IWatchable
