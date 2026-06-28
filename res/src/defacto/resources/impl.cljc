@@ -2,7 +2,8 @@
   (:require
     [clojure.core.async :as async]
     [clojure.core.async.impl.protocols :as iasync]
-    [defacto.core :as defacto]))
+    [defacto.core :as defacto]
+    [defacto.resources.async :as res.async]))
 
 (defn ^:private safely! [request-fn & args]
   (try
@@ -23,9 +24,9 @@
     [:defacto.resources.core/err {:result result
                                   :reason "request-fn must return a vector"}]))
 
-(defn ^:private send-all [send-fn messages result ->output]
-  (run! send-fn (for [msg (distinct messages)]
-                  (conj msg (->output result)))))
+(defn ^:private cbs [messages output]
+  (for [msg (distinct messages)]
+    (conj msg output)))
 
 (defn ^:private ->upload-progress-ch [{:keys [prog-events prog-commands]} emit-cb dispatch-cb]
   (when (or (seq prog-events) (seq prog-commands))
@@ -34,12 +35,12 @@
         (let [report (async/<! chan)]
           (if (= :upload (:direction report))
             (do
-              (send-all emit-cb prog-events report identity)
-              (send-all dispatch-cb prog-commands report identity)
+              (run! emit-cb (cbs prog-events report))
+              (run! dispatch-cb (cbs prog-commands report))
               (recur))
             (do
-              (send-all emit-cb prog-events {:status :complete} identity)
-              (send-all dispatch-cb prog-commands {:status :complete} identity)
+              (run! emit-cb (cbs prog-events {:status :complete}))
+              (run! dispatch-cb (cbs prog-commands {:status :complete}))
               (async/close! chan)))))
       chan)))
 
@@ -51,14 +52,26 @@
     (run! emit-cb pre-events)
     (run! dispatch-cb pre-commands)
     (when (some? params)
-      (let [{:keys [ok-events ok-commands err-events err-commands]} input
-            progress (->upload-progress-ch input emit-cb dispatch-cb)
-            ch (->ch (safely! request-fn resource-type (assoc params :progress progress)))]
+      (let [{:keys [async? ok-events ok-commands err-events err-commands]} input
+            request-id (random-uuid)
+            params (-> params
+                       (assoc :progress (->upload-progress-ch input emit-cb dispatch-cb))
+                       (assoc-in [:headers "x-request-id"] request-id))
+            ch (->ch (safely! request-fn resource-type params))]
         (async/go
+          (when async?
+            (emit-cb [::res.async/-registered request-id ok-commands ok-events ->ok]))
           (let [[status payload] (->result (async/<! ch))
-                [events commands ->output] (if (= :defacto.resources.core/ok status)
-                                             [ok-events ok-commands ->ok]
-                                             [err-events err-commands ->err])]
-            (send-all emit-cb events payload ->output)
-            (send-all dispatch-cb commands payload ->output)))))
+                [events commands ->output] (cond
+                                             (not= :defacto.resources.core/ok status)
+                                             [err-events err-commands ->err]
+
+                                             (not async?)
+                                             [ok-events ok-commands ->ok])
+                output (when ->output (->output payload))]
+            (run! emit-cb (cbs events output))
+            (run! dispatch-cb (cbs commands output))
+            (when async?
+              (async/<! (async/timeout (:timeout input 20000)))
+              (dispatch-cb [::res.async/-timeout! request-id err-commands err-events]))))))
     nil))

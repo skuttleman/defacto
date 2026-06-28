@@ -3,6 +3,7 @@
     [clojure.test :refer [deftest is testing]]
     [clojure.core.async :as async]
     [defacto.core :as defacto]
+    [defacto.resources.async :as-alias res.async]
     [defacto.resources.core :as res]
     [defacto.resources.impl :as impl]
     [slag.test.utils.async :as tua]))
@@ -163,4 +164,67 @@
                         [::err-2! #{{:exception ex
                                      :reason    "request-fn threw an exception"}}]]
                        @commands))))))
+        (done)))))
+
+(deftest async-request!-test
+  (tua/async done
+    (async/go
+      (let [commands (atom #{})
+            events (atom #{})
+            request-id (atom nil)
+            ctx-map {::impl/request-fn (fn [_ req]
+                                         (reset! request-id (get-in req [:headers "x-request-id"]))
+                                         (async/go
+                                           [::res/ok nil]))}
+            store (defacto/create ctx-map
+                                  nil
+                                  {:reducer-mw (fn [reducer]
+                                                 (fn [db event]
+                                                   (swap! events conj event)
+                                                   (reducer db event)))
+                                   :handler-mw (fn [handler]
+                                                 (fn [ctx-map command emit-cb]
+                                                   (swap! commands conj command)
+                                                   (when-not (#{::pre-1! ::pre-2! ::ok-1! ::ok-2! ::err-1! ::err-2!} (first command))
+                                                     (handler ctx-map command emit-cb))))})
+            ctx-map (assoc ctx-map ::defacto/store store)
+            fixture (assoc fixture :async? true :timeout 500)
+            emit-cb (partial defacto/emit! store)]
+        (testing "when requesting a resource"
+          (impl/request! ctx-map fixture emit-cb)
+          (async/<! (async/timeout 5))
+          (testing "and when the results are provided"
+            (is (some? @request-id))
+            (defacto/dispatch! store [::res.async/receive! @request-id {:some :data}])
+            (testing "emits ok-events"
+              (is (contains? @events [::oked-1 [{:some :data}]]))
+              (is (contains? @events [::oked-2 [{:some :data}]])))
+
+            (testing "dispatches ok-commands"
+              (is (contains? @commands [::ok-1! [{:some :data}]]))
+              (is (contains? @commands [::ok-2! [{:some :data}]]))))
+
+          (testing "and when the results are not provided within timeout"
+            (reset! events #{})
+            (reset! commands #{})
+            (impl/request! ctx-map fixture emit-cb)
+            (async/<! (async/timeout 600))
+
+
+            (testing "does not emit ok-events"
+              (is (not (contains? @events [::oked-1 [{:some :data}]])))
+              (is (not (contains? @events [::oked-2 [{:some :data}]]))))
+
+            (testing "does not dispatch ok-commands"
+              (is (not (contains? @commands [::ok-1! [{:some :data}]])))
+              (is (not (contains? @commands [::ok-2! [{:some :data}]]))))
+
+            (testing "emits err-events"
+              (is (contains? @events [::erred-1 {::defacto/reason "Response was not received within timeout"}]))
+              (is (contains? @events [::erred-2 {::defacto/reason "Response was not received within timeout"}])))
+
+            (testing "dispatches err-commands"
+              (is (contains? @commands [::err-1! {::defacto/reason "Response was not received within timeout"}]))
+              (is (contains? @commands [::err-2! {::defacto/reason "Response was not received within timeout"}])))))
+
         (done)))))

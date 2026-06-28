@@ -23,7 +23,8 @@
     (async/go
       (let [calls (atom [])
             request-fn (fn [_ req]
-                         (swap! calls conj [::request-fn req])
+                         (is (uuid? (get-in req [:headers "x-request-id"])))
+                         (swap! calls conj [::request-fn (dissoc req :headers)])
                          [::res/ok {:some :data}])
             store (defacto/create {:defacto.resources.impl/request-fn request-fn} nil)]
         (testing "when ensuring the resource exists"
