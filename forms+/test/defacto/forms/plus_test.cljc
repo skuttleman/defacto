@@ -54,7 +54,7 @@
                 (testing "is in an `error` state"
                   (is (res/error? @sub:form+))
                   (is (= {:some "error"}
-                         (res/payload @sub:form+)))))
+                         (res/errors @sub:form+)))))
 
               (testing "and when the submission succeeds"
                 (reset! resp [::res/ok {:a :ok}])
@@ -98,7 +98,7 @@
 
                 (testing "is in an `error` state"
                   (is (res/error? @sub:form+))
-                  (is (= {::forms/errors {:bad ["errors"]}} (res/payload @sub:form+)))))
+                  (is (= {::forms/errors {:bad ["errors"]}} (res/errors @sub:form+)))))
 
               (testing "and when the validation succeeds"
                 (defacto/emit! store [::forms/changed [::forms+/valid [::res-spec]] [:fail?] false])
@@ -112,7 +112,7 @@
                   (testing "is in an `error` state"
                     (is (res/error? @sub:form+))
                     (is (= {:some "error"}
-                           (res/payload @sub:form+)))))
+                           (res/errors @sub:form+)))))
 
                 (testing "and when the submission succeeds"
                   (reset! resp [::res/ok {:a :ok}])

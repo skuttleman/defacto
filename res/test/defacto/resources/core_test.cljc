@@ -5,7 +5,7 @@
     [clojure.test :refer [deftest is testing]]
     [defacto.core :as defacto]
     [defacto.resources.core :as res]
-    [defacto.test.utils :as tu]))
+    [slag.test.utils.async :as tua]))
 
 (defmethod res/->request-spec ::resource
   [_ params]
@@ -19,7 +19,7 @@
   (assoc db ::resource value))
 
 (deftest resources-test
-  (tu/async done
+  (tua/async done
     (async/go
       (let [calls (atom [])
             request-fn (fn [_ req]
@@ -112,7 +112,7 @@
               (let [resource (defacto/query-responder @store [::res/?:resource [::resource 123]])]
                 (testing "returns the successful resource"
                   (is (res/error? resource))
-                  (is (= {:some :data} (res/payload resource)))))))
+                  (is (= {:some :data} (res/errors resource)))))))
 
           (testing "and when the resource is unsubmitted"
             (defacto/emit! store [::res/destroyed [::resource 123]])
