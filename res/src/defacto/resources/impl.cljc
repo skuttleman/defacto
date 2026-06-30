@@ -60,7 +60,10 @@
             ch (->ch (safely! request-fn resource-type params))]
         (async/go
           (when async?
-            (emit-cb [::res.async/-registered request-id ok-commands ok-events ->ok]))
+            (emit-cb [::res.async/-registered
+                      request-id
+                      {:ok  [ok-commands ok-events ->ok]
+                       :err [err-commands err-events ->err]}]))
           (let [[status payload] (->result (async/<! ch))
                 [events commands ->output] (cond
                                              (not= :defacto.resources.core/ok status)
@@ -73,5 +76,5 @@
             (run! dispatch-cb (cbs commands output))
             (when async?
               (async/<! (async/timeout (:timeout input 20000)))
-              (dispatch-cb [::res.async/-timeout! request-id err-commands err-events]))))))
+              (dispatch-cb [::res.async/-timeout! request-id]))))))
     nil))

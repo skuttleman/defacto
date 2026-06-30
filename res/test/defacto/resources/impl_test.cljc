@@ -204,6 +204,23 @@
               (is (contains? @commands [::ok-1! [{:some :data}]]))
               (is (contains? @commands [::ok-2! [{:some :data}]]))))
 
+          (testing "and when re-requesting a resource"
+            (reset! events #{})
+            (reset! commands #{})
+            (impl/request! ctx-map fixture emit-cb)
+            (async/<! (async/timeout 5))
+
+            (testing "and when the request fails"
+              (is (some? @request-id))
+              (defacto/dispatch! store [::res.async/error! @request-id {:some :error}])
+              (testing "emits err-events"
+                (is (contains? @events [::erred-1 #{{:some :error}}]))
+                (is (contains? @events [::erred-2 #{{:some :error}}])))
+
+              (testing "dispatches err-commands"
+                (is (contains? @commands [::err-1! #{{:some :error}}]))
+                (is (contains? @commands [::err-2! #{{:some :error}}])))))
+
           (testing "and when the results are not provided within timeout"
             (reset! events #{})
             (reset! commands #{})
